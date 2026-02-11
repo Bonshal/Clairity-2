@@ -1,0 +1,114 @@
+name: CI — Market Research Platform
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ─── API (Node.js) ────────────────────────────────────────
+  api-lint-build:
+    name: API — Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm run lint --if-present
+
+  # ─── Analysis (Python) ───────────────────────────────────
+  analysis-lint:
+    name: Analysis — Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: analysis
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check src/
+
+      - name: Type check
+        run: uv run mypy src/ --ignore-missing-imports || true
+
+  # ─── Frontend (Next.js) ──────────────────────────────────
+  frontend-build:
+    name: Frontend — Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+  # ─── Docker Compose Validation ──────────────────────────
+  docker-validate:
+    name: Docker — Validate Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config --quiet
+
+  # ─── Deploy (only on main) ─────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    needs: [api-lint-build, analysis-lint, frontend-build, docker-validate]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /opt/market-research-platform
+            git pull origin main
+            docker compose build
+            docker compose up -d
+            docker compose exec -T api npx prisma db push --skip-generate || true
+            docker compose ps

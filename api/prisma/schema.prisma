@@ -1,0 +1,151 @@
+// Prisma schema for Market Research Platform
+// Database: Neon PostgreSQL with pgvector extension
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+/// Platform content unified across Reddit, X/Twitter, YouTube
+model ContentItem {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  platform          String    @db.VarChar(20) // 'reddit', 'twitter', 'youtube'
+  platformId        String    @db.VarChar(255) @map("platform_id")
+  contentType       String    @db.VarChar(50) @map("content_type") // 'post', 'tweet', 'video', 'comment'
+  title             String?   @db.Text
+  body              String?   @db.Text
+  author            String?   @db.VarChar(255)
+  url               String?   @db.Text
+  contentHash       String    @unique @db.VarChar(64) @map("content_hash")
+  language          String    @default("en") @db.VarChar(10)
+
+  // Engagement metrics
+  upvotes           Int       @default(0)
+  downvotes         Int       @default(0)
+  likes             Int       @default(0)
+  views             BigInt    @default(0)
+  commentsCount     Int       @default(0) @map("comments_count")
+  shares            Int       @default(0)
+
+  // Metadata
+  platformCreatedAt DateTime? @map("platform_created_at") @db.Timestamptz
+  fetchedAt         DateTime  @default(now()) @map("fetched_at") @db.Timestamptz
+  processedAt       DateTime? @map("processed_at") @db.Timestamptz
+  batchId           String?   @db.VarChar(100) @map("batch_id")
+
+  // Vector embedding (384-dim from all-MiniLM-L6-v2)
+  // Note: pgvector column managed via raw SQL migration
+  // embedding      Unsupported("vector(384)")
+
+  // Relations
+  sentimentResults  SentimentResult[]
+
+  @@unique([platform, platformId])
+  @@index([platform, platformCreatedAt(sort: Desc)], name: "idx_content_platform_time")
+  @@map("content_items")
+}
+
+/// Sentiment and emotion analysis results
+model SentimentResult {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contentId       String    @db.Uuid @map("content_id")
+  sentiment       String?   @db.VarChar(20) // 'positive', 'negative', 'neutral'
+  sentimentScore  Float?    @map("sentiment_score")
+  emotions        Json?     // {"joy": 0.8, "surprise": 0.3, ...}
+  analyzedAt      DateTime  @default(now()) @map("analyzed_at") @db.Timestamptz
+
+  content         ContentItem @relation(fields: [contentId], references: [id])
+
+  @@map("sentiment_results")
+}
+
+/// Topic clusters from BERTopic
+model TopicCluster {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clusterLabel       String?   @db.Text @map("cluster_label")
+  keywords           String[]  @db.Text
+  representativeDocs String[]  @db.Uuid @map("representative_docs")
+  docCount           Int       @map("doc_count")
+  avgSentiment       Float?    @map("avg_sentiment")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  analysisRunId      String?   @db.VarChar(100) @map("analysis_run_id")
+
+  // Relations
+  trendSignals       TrendSignal[]
+
+  @@map("topic_clusters")
+}
+
+/// Detected trend signals
+model TrendSignal {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  topicClusterId  String?   @db.Uuid @map("topic_cluster_id")
+  keyword         String    @db.Text
+  platform        String    @db.VarChar(20)
+  direction       String    @db.VarChar(20) // 'emerging', 'declining', 'stable', 'viral'
+  momentum7d      Float     @map("momentum_7d")
+  momentum30d     Float     @map("momentum_30d")
+  volumeCurrent   Int       @map("volume_current")
+  volumePrevious  Int       @map("volume_previous")
+  confidence      Float
+  detectedAt      DateTime  @default(now()) @map("detected_at") @db.Timestamptz
+
+  topicCluster    TopicCluster? @relation(fields: [topicClusterId], references: [id])
+
+  @@map("trend_signals")
+}
+
+/// Content recommendations with SEO/GEO data
+model Recommendation {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String    @db.Text
+  contentAngle     String?   @db.Text @map("content_angle")
+  targetKeywords   String[]  @db.Text @map("target_keywords")
+  keywordIntent    String?   @db.VarChar(50) @map("keyword_intent")
+  seoScore         Float?    @map("seo_score")
+  geoOptimization  Json?     @map("geo_optimization")
+  confidence       Float?
+  reasoning        String?   @db.Text
+  sourceTrends     String[]  @db.Uuid @map("source_trends")
+  sourceInsights   Json?     @map("source_insights")
+  evaluationScore  Float?    @map("evaluation_score")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  analysisRunId    String?   @db.VarChar(100) @map("analysis_run_id")
+
+  @@map("recommendations")
+}
+
+/// Tracks each full pipeline execution
+model AnalysisRun {
+  id                  String    @id @db.VarChar(100)
+  startedAt           DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  status              String    @db.VarChar(20) // 'running', 'completed', 'failed'
+  platformsProcessed  String[]  @db.Text @map("platforms_processed")
+  itemsProcessed      Int       @default(0) @map("items_processed")
+  evaluationScore     Float?    @map("evaluation_score")
+  metadata            Json?
+
+  @@map("analysis_runs")
+}
+
+/// User niche configurations
+model Niche {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String    @db.VarChar(255)
+  keywords        String[]  @db.Text
+  subreddits      String[]  @db.Text
+  twitterQueries  String[]  @db.Text @map("twitter_queries")
+  youtubeQueries  String[]  @db.Text @map("youtube_queries")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("niches")
+}

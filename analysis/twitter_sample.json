@@ -1,0 +1,45 @@
+{
+  "type": "tweet",
+  "id": "2021546056799121739",
+  "url": "https://x.com/ItsFemi_R/status/2021546056799121739",
+  "twitterUrl": "https://twitter.com/ItsFemi_R/status/2021546056799121739",
+  "text": "It is 2026. We have AI agents and self-driving cars, yet switching @WhatsApp to a new phone still feels like defusing a bomb.\n\nWhy is a simple \"Cloud Login\" still too much to ask for? The anxiety of losing chat history shouldn't exist anymore.",
+  "source": "Twitter for Android",
+  "retweetCount": 0,
+  "replyCount": 0,
+  "likeCount": 0,
+  "quoteCount": 0,
+  "viewCount": 3,
+  "createdAt": "Wed Feb 11 11:25:13 +0000 2026",
+  "lang": "en",
+  "bookmarkCount": 0,
+  "isReply": false,
+  "inReplyToId": null,
+  "conversationId": "2021546056799121739",
+  "media": [],
+  "inReplyToUserId": null,
+  "author": {
+    "type": "user",
+    "userName": "ItsFemi_R",
+    "url": "https://x.com/ItsFemi_R",
+    "id": "948719784174194688",
+    "name": "Oluwafemi Adelekan",
+    "isVerified": false,
+    "isBlueVerified": false,
+    "profilePicture": "https://pbs.twimg.com/profile_images/2018311638118445056/EUQPgD8q_normal.jpg",
+    "coverPicture": "https://pbs.twimg.com/profile_banners/948719784174194688/1666275857",
+    "description": "Product Designer at The UX Professionals",
+    "location": "Lagos, Nigeria",
+    "followers": 2629,
+    "following": 2423,
+    "createdAt": "Thu Jan 04 00:56:37 +0000 2018"
+  },
+  "quoted_tweet": {
+    "id": "2021296945059246578",
+    "text": "drop a suggestion for any brand/company/app.",
+    "user": {
+      "name": "\u200f\u064b",
+      "screen_name": "onedarkhorse_"
+    }
+  }
+}

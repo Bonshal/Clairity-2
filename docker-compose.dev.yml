@@ -1,0 +1,29 @@
+# Dev overrides — hot reload, volume mounts, no nginx
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: "3.8"
+
+services:
+  node-api:
+    build:
+      target: development
+    volumes:
+      - ./api/src:/app/src
+      - ./api/prisma:/app/prisma
+    command: npx nodemon --exec ts-node src/index.ts
+    environment:
+      - NODE_ENV=development
+
+  python-analysis:
+    build:
+      target: development
+    volumes:
+      - ./analysis/src:/app/src
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - ENVIRONMENT=development
+
+  # Nginx not needed in dev — access services directly
+  nginx:
+    profiles:
+      - production

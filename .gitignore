@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.local
+.env.production
+
+# Node
+node_modules/
+dist/
+.next/
+out/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+api/prisma/migrations/
+
+# ML models cache
+analysis/.cache/

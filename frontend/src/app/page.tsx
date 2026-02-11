@@ -1,0 +1,38 @@
+"use client";
+
+import AppShell from "@/components/AppShell";
+import KPICards from "@/components/dashboard/KPICards";
+import TrendChart from "@/components/dashboard/TrendChart";
+import SentimentDonut from "@/components/dashboard/SentimentDonut";
+import TopTrends from "@/components/dashboard/TopTrends";
+import RecentAlerts from "@/components/dashboard/RecentAlerts";
+import PlatformBreakdown from "@/components/dashboard/PlatformBreakdown";
+
+export default function DashboardPage() {
+  return (
+    <AppShell>
+      <div className="page-header">
+        <h2 className="page-title">
+          Market <span className="gradient-text">Intelligence</span>
+        </h2>
+        <p className="page-subtitle">
+          Real-time insights across Reddit, X, and YouTube — updated 4 min ago
+        </p>
+      </div>
+
+      <KPICards />
+
+      <div className="chart-grid-3">
+        <TrendChart />
+        <SentimentDonut />
+      </div>
+
+      <div className="chart-grid">
+        <TopTrends />
+        <RecentAlerts />
+      </div>
+
+      <PlatformBreakdown />
+    </AppShell>
+  );
+}
