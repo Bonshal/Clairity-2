@@ -52,7 +52,7 @@ jobs:
         run: pip install uv
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra dev
 
       - name: Ruff lint
         run: uv run ruff check src/
@@ -87,6 +87,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - run: touch .env
       - run: docker compose config --quiet
 
   # ─── Deploy (only on main) ─────────────────────────────
