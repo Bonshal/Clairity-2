@@ -1,7 +1,11 @@
 """Normalization functions for raw platform data."""
 
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional
+import logging
+from src.ingestion.reddit import _normalize_item
+
+logger = logging.getLogger(__name__)
 
 def normalize_twitter_data(raw_items: list[dict]) -> list[dict]:
     """Normalize raw Twitter/GetXAPI data."""
@@ -22,7 +26,6 @@ def normalize_twitter_data(raw_items: list[dict]) -> list[dict]:
         author = user.get("screen_name") or user.get("name") or "unknown"
         
         # Parse timestamp if available
-        created_at_str = tw.get("created_at")
         created_at: Optional[datetime] = None
         # TODO: parse specific format if needed
 
@@ -69,11 +72,6 @@ def normalize_youtube_data(raw_items: list[dict]) -> list[dict]:
             "platform_created_at": None, # complex parsing needed
         })
     return items
-
-from src.ingestion.reddit import _normalize_item
-import logging
-
-logger = logging.getLogger(__name__)
 
 def normalize_reddit_data(raw_items: list[dict]) -> list[dict]:
     """Normalize raw Reddit Apify data."""

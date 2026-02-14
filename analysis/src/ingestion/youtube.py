@@ -1,6 +1,7 @@
 """YouTube data fetcher via official YouTube Data API v3."""
 
 import logging
+import asyncio
 from googleapiclient.discovery import build
 
 from src.config import settings
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 youtube = build("youtube", "v3", developerKey=settings.youtube_api_key)
 
 
-import asyncio
+
 
 async def search_youtube_videos(
     query: str,

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from collections import Counter
 
 from src.state import PlatformState, SentimentSummary, EmotionSummary
-from src.db.neon import get_session, fetch_content_by_ids, SentimentResultModel, async_session
+from src.db.neon import fetch_content_by_ids, SentimentResultModel, async_session
 from src.ml.sentiment import analyze_sentiment_batch
 from src.ml.emotions import detect_emotions_batch
 
@@ -78,7 +78,6 @@ async def sentiment_agent(state: PlatformState) -> dict:
     
     for i, (sent, emo) in enumerate(zip(sentiments, emotions)):
         # Calculate max emotion
-        dominant_emotion = emo.dominant
         
         result_models.append(SentimentResultModel(
             id=uuid.uuid4(),

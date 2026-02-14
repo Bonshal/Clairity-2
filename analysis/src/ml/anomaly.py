@@ -83,7 +83,6 @@ def _extract_features(item: dict) -> dict[str, float]:
     views = float(item.get("views", 0) or 0)
     comments = float(item.get("comments_count", item.get("comments", 0)) or 0)
     shares = float(item.get("shares", item.get("retweets", 0)) or 0)
-    upvotes = float(item.get("upvotes", 0) or 0)
 
     # Derived ratios (avoid division by zero)
     engagement_rate = (likes + comments + shares) / max(views, 1)

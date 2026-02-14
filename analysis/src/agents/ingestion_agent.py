@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+
 
 from src.state import PlatformState, IngestionMetadata, PlatformEnum
 from src.ingestion.twitter import fetch_twitter_data

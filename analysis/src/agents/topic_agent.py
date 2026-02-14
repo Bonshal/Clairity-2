@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from src.state import PlatformState, TopicCluster as TopicClusterState
 from src.ml.topics import run_topic_modeling
-from src.db.neon import get_session, fetch_content_by_ids, TopicClusterModel, async_session
+from src.db.neon import fetch_content_by_ids, TopicClusterModel, async_session
 
 logger = logging.getLogger(__name__)
 
