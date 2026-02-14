@@ -4,7 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from src.config import settings
 
 client = AsyncIOMotorClient(settings.mongodb_uri)
-db = client.market_research
+db = client.market_research  # Database: market_research
 
 # ─── Collections ──────────────────────────────────────────
 raw_reddit = db.raw_reddit_posts
@@ -37,6 +37,15 @@ async def store_raw_data(
         result = await collection.insert_many(documents)
         return len(result.inserted_ids)
     return 0
+
+
+async def fetch_raw_data(collection_name: str, batch_id: str) -> list[dict]:
+    """Fetch raw API responses from MongoDB by batch ID."""
+    collection = db[collection_name]
+    cursor = collection.find({"batch_id": batch_id})
+    items = await cursor.to_list(length=None)
+    # Extract only the raw data payload
+    return [doc["raw_data"] for doc in items]
 
 
 async def ping() -> bool:

@@ -1,43 +1,65 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { AlertTriangle, TrendingUp, Zap, MessageCircle } from "lucide-react";
+import { fetchDashboardAlerts } from "@/lib/api";
 
-const ALERTS = [
-    {
-        type: "viral",
-        icon: Zap,
-        title: '"AI code review tools" hit viral threshold',
-        desc: "+520% momentum, Z-score 4.2",
-        time: "12 min ago",
-        color: "#c084fc",
-    },
-    {
-        type: "emerging",
-        icon: TrendingUp,
-        title: 'New cluster: "MCP server integrations"',
-        desc: "Detected across Reddit + Twitter, 156 mentions",
-        time: "38 min ago",
-        color: "#00e5c8",
-    },
-    {
-        type: "sentiment",
-        icon: MessageCircle,
-        title: "Sentiment shift on AI agents topic",
-        desc: "Positive sentiment dropped 12% in 24h",
-        time: "1h ago",
-        color: "#fbbf24",
-    },
-    {
-        type: "anomaly",
-        icon: AlertTriangle,
-        title: "Engagement outlier detected",
-        desc: 'YouTube video "Build MCP from scratch" — 12x avg views',
-        time: "2h ago",
-        color: "#f87171",
-    },
-];
+type Alert = {
+    type: string;
+    icon: any;
+    title: string;
+    desc: string;
+    time: string;
+    color: string;
+};
+
+const DEFAULT_ALERTS: Alert[] = [];
+
+function timeAgo(dateString: string) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    return `${Math.floor(diffInHours / 24)}d ago`;
+}
 
 export default function RecentAlerts() {
+    const [alerts, setAlerts] = useState<Alert[]>(DEFAULT_ALERTS);
+
+    useEffect(() => {
+        async function loadData() {
+            try {
+                const data = await fetchDashboardAlerts();
+
+                const mapped: Alert[] = (data.alerts || []).map((a) => {
+                    let icon = TrendingUp;
+                    let color = "#0ea5e9";
+                    if (a.direction === "viral") { icon = Zap; color = "#c084fc"; }
+                    else if (a.direction === "declining") { icon = AlertTriangle; color = "#f87171"; }
+                    else if (a.direction === "stable") { icon = MessageCircle; color = "#fbbf24"; }
+
+                    return {
+                        type: a.direction,
+                        icon,
+                        title: `Trend: "${a.keyword}"`,
+                        desc: `${a.direction} on ${a.platform}`,
+                        time: timeAgo(a.detectedAt),
+                        color
+                    };
+                });
+                setAlerts(mapped);
+            } catch (err) {
+                console.error("Failed to load alerts:", err);
+            }
+        }
+        loadData();
+    }, []);
+
     return (
         <div className="chart-card">
             <div className="chart-header">
@@ -56,12 +78,17 @@ export default function RecentAlerts() {
                         borderRadius: 8,
                     }}
                 >
-                    4 new
+                    {alerts.length} new
                 </span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {ALERTS.map((alert, i) => (
+                {alerts.length === 0 && (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-secondary)" }}>
+                        No recent alerts.
+                    </div>
+                )}
+                {alerts.map((alert, i) => (
                     <div
                         key={i}
                         style={{

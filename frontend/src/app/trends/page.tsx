@@ -3,32 +3,53 @@
 import AppShell from "@/components/AppShell";
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, BarChart, Bar, Cell,
+    ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, Filter, ArrowUpRight, Zap, ArrowDownRight } from "lucide-react";
-
-const TIMELINE_DATA = Array.from({ length: 30 }, (_, i) => ({
-    day: `Jan ${i + 1}`,
-    volume: Math.floor(80 + Math.random() * 100 + (i > 20 ? i * 5 : 0)),
-    emerging: Math.floor(2 + Math.random() * 5 + (i > 22 ? 3 : 0)),
-}));
-
-const ALL_TRENDS = [
-    { keyword: "AI code review tools", direction: "viral", momentum7d: 5.2, momentum30d: 3.1, volume: 342, confidence: 0.94, platforms: ["reddit", "twitter", "youtube"] },
-    { keyword: "open-source LLM alternatives", direction: "emerging", momentum7d: 1.8, momentum30d: 1.2, volume: 215, confidence: 0.87, platforms: ["reddit", "twitter"] },
-    { keyword: "vibe coding workflow", direction: "emerging", momentum7d: 1.45, momentum30d: 0.9, volume: 189, confidence: 0.82, platforms: ["twitter", "youtube"] },
-    { keyword: "MCP server integrations", direction: "viral", momentum7d: 3.4, momentum30d: 2.8, volume: 156, confidence: 0.91, platforms: ["reddit", "twitter", "youtube"] },
-    { keyword: "AI agent frameworks", direction: "emerging", momentum7d: 0.92, momentum30d: 0.7, volume: 134, confidence: 0.78, platforms: ["reddit", "youtube"] },
-    { keyword: "cursor vs windsurf", direction: "stable", momentum7d: 0.12, momentum30d: 0.08, volume: 128, confidence: 0.72, platforms: ["reddit", "twitter"] },
-    { keyword: "RAG pipeline optimize", direction: "emerging", momentum7d: 0.78, momentum30d: 0.5, volume: 95, confidence: 0.75, platforms: ["youtube"] },
-    { keyword: "browser automation AI", direction: "declining", momentum7d: -0.15, momentum30d: -0.22, volume: 72, confidence: 0.68, platforms: ["twitter"] },
-    { keyword: "local model inference", direction: "emerging", momentum7d: 0.65, momentum30d: 0.4, volume: 88, confidence: 0.73, platforms: ["reddit"] },
-    { keyword: "prompt engineering dead", direction: "declining", momentum7d: -0.35, momentum30d: -0.18, volume: 64, confidence: 0.66, platforms: ["twitter", "reddit"] },
-];
+import { useState, useEffect } from "react";
+import { fetchTopTrends, fetchTrendTimeline } from "@/lib/api";
 
 export default function TrendsPage() {
-    const viral = ALL_TRENDS.filter(t => t.direction === "viral").length;
-    const emerging = ALL_TRENDS.filter(t => t.direction === "emerging").length;
+    const [trends, setTrends] = useState<any[]>([]);
+    const [timeline, setTimeline] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadData() {
+            try {
+                const [trendsData, timelineData] = await Promise.all([
+                    fetchTopTrends(50),
+                    fetchTrendTimeline()
+                ]);
+
+                // Map trends
+                setTrends(trendsData.trends.map(t => ({
+                    keyword: t.keyword,
+                    direction: t.direction,
+                    momentum7d: t.momentum7d,
+                    volume: t.volumeCurrent,
+                    confidence: t.confidence,
+                    platforms: t.platforms || ["twitter"] // fallback
+                })));
+
+                // Map timeline
+                setTimeline(timelineData.timeline.map(t => ({
+                    day: new Date(t.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                    volume: t.volume,
+                    emerging: t.emerging
+                })));
+
+            } catch (err) {
+                console.error("Failed to load trends:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadData();
+    }, []);
+
+    const viral = trends.filter(t => t.direction === "viral").length;
+    const emerging = trends.filter(t => t.direction === "emerging").length;
 
     return (
         <AppShell>
@@ -37,7 +58,7 @@ export default function TrendsPage() {
                     Trend <span className="gradient-text">Explorer</span>
                 </h2>
                 <p className="page-subtitle">
-                    Track keyword momentum across all platforms — {ALL_TRENDS.length} signals detected
+                    Track keyword momentum across all platforms — {trends.length} signals detected
                 </p>
             </div>
 
@@ -65,7 +86,7 @@ export default function TrendsPage() {
                     </div>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
-                    <AreaChart data={TIMELINE_DATA} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
+                    <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
                         <defs>
                             <linearGradient id="gradVol" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.2} />
@@ -116,9 +137,17 @@ export default function TrendsPage() {
                     <span>Platforms</span>
                 </div>
 
-                {ALL_TRENDS.map((t, i) => (
+                {loading && <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)" }}>Loading trends...</div>}
+
+                {!loading && trends.length === 0 && (
+                    <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)" }}>
+                        No trends detected yet. Run the pipeline to populate data.
+                    </div>
+                )}
+
+                {trends.map((t, i) => (
                     <div
-                        key={t.keyword}
+                        key={`${t.keyword}-${i}`}
                         className="trend-item"
                         style={{
                             display: "grid",
@@ -150,7 +179,7 @@ export default function TrendsPage() {
                             {(t.confidence * 100).toFixed(0)}%
                         </span>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                            {t.platforms.map((p) => (
+                            {t.platforms.map((p: string) => (
                                 <span key={p} className={`tag tag-platform ${p}`}>
                                     {p === "twitter" ? "X" : p}
                                 </span>

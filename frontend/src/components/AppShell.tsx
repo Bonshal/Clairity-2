@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, ReactNode } from "react";
+import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,14 +18,15 @@ import {
     Bell,
     Sparkles,
 } from "lucide-react";
+import { fetchDashboardKPIs, fetchRecommendations, fetchContent } from "@/lib/api";
 
 const NAV_ITEMS = [
     {
         section: "Overview",
         items: [
             { label: "Dashboard", href: "/", icon: LayoutDashboard },
-            { label: "Trends", href: "/trends", icon: TrendingUp, badge: "12" },
-            { label: "Recommendations", href: "/recommendations", icon: Lightbulb, badge: "5" },
+            { label: "Trends", href: "/trends", icon: TrendingUp, badge: "0" },
+            { label: "Recommendations", href: "/recommendations", icon: Lightbulb, badge: "0" },
         ],
     },
     {
@@ -47,7 +48,35 @@ const NAV_ITEMS = [
 
 export default function AppShell({ children }: { children: ReactNode }) {
     const [collapsed, setCollapsed] = useState(false);
+    const [counts, setCounts] = useState({ trends: 0, recs: 0, content: 0 });
     const pathname = usePathname();
+
+    useEffect(() => {
+        async function loadCounts() {
+            try {
+                const [kpis, recs, content] = await Promise.all([
+                    fetchDashboardKPIs(),
+                    fetchRecommendations(1, 1),
+                    fetchContent(1, 1)
+                ]);
+                setCounts({
+                    trends: kpis.trendCount || 0,
+                    recs: recs.total || 0,
+                    content: content.total || 0
+                });
+            } catch (err) {
+                console.error("Failed to load sidebar counts:", err);
+            }
+        }
+        loadCounts();
+    }, []);
+
+    const getBadge = (href: string) => {
+        if (href === "/trends" && counts.trends > 0) return counts.trends > 99 ? "99+" : counts.trends.toString();
+        if (href === "/recommendations" && counts.recs > 0) return counts.recs > 99 ? "99+" : counts.recs.toString();
+        if (href === "/content" && counts.content > 0) return counts.content > 999 ? "1k+" : counts.content.toString();
+        return null;
+    };
 
     return (
         <div className="app-layout">
@@ -57,7 +86,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                     <div className="sidebar-logo-icon">
                         <Sparkles size={18} color="#06080d" strokeWidth={2.5} />
                     </div>
-                    <span className="sidebar-logo-text gradient-text">Nexus AI</span>
+                    <span className="sidebar-logo-text gradient-text">Clairity</span>
                 </div>
 
                 <div className="sidebar-nav">
@@ -69,6 +98,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
                                     item.href === "/"
                                         ? pathname === "/"
                                         : pathname.startsWith(item.href);
+
+                                const badge = getBadge(item.href);
+
                                 return (
                                     <Link
                                         key={item.href}
@@ -79,8 +111,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
                                             <item.icon size={18} />
                                         </span>
                                         <span className="nav-item-label">{item.label}</span>
-                                        {item.badge && (
-                                            <span className="nav-badge">{item.badge}</span>
+                                        {badge && (
+                                            <span className="nav-badge">{badge}</span>
                                         )}
                                     </Link>
                                 );

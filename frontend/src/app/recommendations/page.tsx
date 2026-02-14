@@ -2,69 +2,8 @@
 
 import AppShell from "@/components/AppShell";
 import { Lightbulb, ArrowUpRight, Search, Target, Globe, Sparkles } from "lucide-react";
-
-const RECS = [
-    {
-        title: "Complete Guide to AI Code Review Tools in 2026",
-        angle: "Compare top 8 AI code review tools with hands-on benchmarks. Cover accuracy, speed, language support, and pricing.",
-        format: "Guide",
-        audience: "Senior developers & tech leads",
-        effort: "medium",
-        confidence: 0.94,
-        seoScore: 0.89,
-        geoScore: 0.82,
-        keywords: ["AI code review", "code review tools", "automated code review"],
-        platforms: ["reddit", "youtube"],
-    },
-    {
-        title: "How to Build MCP Server Integrations from Scratch",
-        angle: "Step-by-step tutorial covering the Model Context Protocol specification, building custom tools, and connecting to popular AI assistants.",
-        format: "Tutorial",
-        audience: "AI developers & tool builders",
-        effort: "high",
-        confidence: 0.91,
-        seoScore: 0.92,
-        geoScore: 0.88,
-        keywords: ["MCP server", "model context protocol", "AI tool integration"],
-        platforms: ["reddit", "twitter", "youtube"],
-    },
-    {
-        title: "Open-Source LLM Alternatives: The Definitive Comparison",
-        angle: "In-depth comparison of Llama 4, Mistral, Qwen, and DeepSeek. Benchmark on coding, reasoning, and creative tasks with real examples.",
-        format: "Comparison",
-        audience: "ML engineers & AI enthusiasts",
-        effort: "high",
-        confidence: 0.87,
-        seoScore: 0.85,
-        geoScore: 0.79,
-        keywords: ["open source LLM", "LLM comparison", "best open source AI"],
-        platforms: ["reddit", "youtube"],
-    },
-    {
-        title: "Vibe Coding: Why AI Pair Programming is Changing Everything",
-        angle: "Explore the emerging 'vibe coding' workflow — using AI to describe intent and let the model write code. Include productivity data and developer sentiment.",
-        format: "Blog",
-        audience: "Junior-mid developers",
-        effort: "low",
-        confidence: 0.82,
-        seoScore: 0.78,
-        geoScore: 0.85,
-        keywords: ["vibe coding", "AI pair programming", "coding with AI"],
-        platforms: ["twitter"],
-    },
-    {
-        title: "RAG Pipeline Optimization: 7 Techniques That Actually Work",
-        angle: "Advanced techniques for improving RAG accuracy: hybrid search, reranking, chunk optimization, query decomposition, and evaluation frameworks.",
-        format: "Guide",
-        audience: "AI engineers building RAG systems",
-        effort: "medium",
-        confidence: 0.78,
-        seoScore: 0.88,
-        geoScore: 0.76,
-        keywords: ["RAG optimization", "RAG pipeline", "retrieval augmented generation"],
-        platforms: ["reddit"],
-    },
-];
+import { useState, useEffect } from "react";
+import { fetchRecommendations, generateRecommendations } from "@/lib/api";
 
 const formatColors: Record<string, string> = {
     Guide: "#00e5c8",
@@ -75,6 +14,51 @@ const formatColors: Record<string, string> = {
 };
 
 export default function RecommendationsPage() {
+    const [recs, setRecs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [generating, setGenerating] = useState(false);
+
+    async function loadData() {
+        setLoading(true);
+        try {
+            const res = await fetchRecommendations();
+            const mapped = res.recommendations.map(r => ({
+                title: r.title,
+                angle: r.contentAngle,
+                format: r.suggestedFormat,
+                audience: r.targetAudience,
+                effort: "medium", // API doesn't return effort yet
+                confidence: r.confidence || 0.85,
+                seoScore: r.seo?.seoScore || 0,
+                geoScore: r.geo?.geoScore || 0,
+                keywords: [r.seo?.primaryKeyword].filter(Boolean) as string[],
+                platforms: ["twitter", "linkedin"], // default
+            }));
+            setRecs(mapped);
+        } catch (err) {
+            console.error("Failed to load recommendations:", err);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const handleGenerate = async () => {
+        setGenerating(true);
+        try {
+            await generateRecommendations();
+            alert("Recommendations generation triggered! Check back in a few minutes.");
+        } catch (err) {
+            console.error("Failed to trigger generation:", err);
+            alert("Failed to trigger generation");
+        } finally {
+            setGenerating(false);
+        }
+    };
+
     return (
         <AppShell>
             <div className="page-header">
@@ -87,25 +71,35 @@ export default function RecommendationsPage() {
                             AI-generated content strategies with SEO & GEO optimization scores
                         </p>
                     </div>
-                    <button className="btn btn-primary">
-                        <Sparkles size={16} /> Generate New
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleGenerate}
+                        disabled={generating}
+                    >
+                        <Sparkles size={16} /> {generating ? "Generating..." : "Generate New"}
                     </button>
                 </div>
             </div>
 
             <div className="rec-grid">
-                {RECS.map((rec, i) => (
+                {loading && <div style={{ color: "var(--text-muted)" }}>Loading recommendations...</div>}
+
+                {!loading && recs.length === 0 && (
+                    <div style={{ color: "var(--text-muted)" }}>No recommendations yet. Click Generate New to start.</div>
+                )}
+
+                {recs.map((rec, i) => (
                     <div key={i} className="rec-card">
                         {/* Format badge */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <span
                                 className="rec-format"
-                                style={{ borderColor: `${formatColors[rec.format]}30`, color: formatColors[rec.format] }}
+                                style={{ borderColor: `${formatColors[rec.format] || formatColors.Blog}30`, color: formatColors[rec.format] || formatColors.Blog }}
                             >
                                 {rec.format}
                             </span>
                             <div style={{ display: "flex", gap: 4 }}>
-                                {rec.platforms.map((p) => (
+                                {rec.platforms.map((p: string) => (
                                     <span key={p} className={`tag tag-platform ${p}`} style={{ fontSize: "0.65rem", padding: "2px 6px" }}>
                                         {p === "twitter" ? "X" : p}
                                     </span>
@@ -121,7 +115,7 @@ export default function RecommendationsPage() {
 
                         {/* Keywords */}
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {rec.keywords.map((kw) => (
+                            {rec.keywords.slice(0, 3).map((kw: string) => (
                                 <span key={kw} className="tag">{kw}</span>
                             ))}
                         </div>

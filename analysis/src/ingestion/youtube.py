@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 youtube = build("youtube", "v3", developerKey=settings.youtube_api_key)
 
 
+import asyncio
+
 async def search_youtube_videos(
     query: str,
     max_results: int = 50,
@@ -38,7 +40,8 @@ async def search_youtube_videos(
             order="relevance",
             publishedAfter=published_after,
         )
-        response = request.execute()
+        # Wrap blocking execute() call
+        response = await asyncio.to_thread(request.execute)
 
         video_ids = [item["id"]["videoId"] for item in response.get("items", [])]
         logger.info(f"Found {len(video_ids)} videos")
@@ -70,7 +73,8 @@ async def get_video_details(video_ids: list[str]) -> list[dict]:
             part="snippet,statistics,contentDetails",
             id=",".join(video_ids),
         )
-        response = request.execute()
+        # Wrap blocking execute() call
+        response = await asyncio.to_thread(request.execute)
 
         videos = [
             {

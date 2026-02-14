@@ -4,7 +4,7 @@ import logging
 import json
 import uuid
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 from src.state import (
     PlatformState, Recommendation, SEOAnalysis, GEOAnalysis,

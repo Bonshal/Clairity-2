@@ -2,11 +2,11 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Text, Integer, BigInteger, Float, DateTime, Boolean, JSON
+from sqlalchemy import String, Text, Integer, BigInteger, Float, DateTime, Boolean, JSON, select
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Sequence
 import uuid
 
 from src.config import settings
@@ -107,7 +107,65 @@ class AnalysisRunModel(Base):
     run_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
 
 
+class NicheModel(Base):
+    __tablename__ = "niches"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255))
+    keywords: Mapped[list] = mapped_column(ARRAY(Text), default=[])
+    subreddits: Mapped[list] = mapped_column(ARRAY(Text), default=[])
+    twitter_queries: Mapped[list] = mapped_column(ARRAY(Text), default=[])
+    youtube_queries: Mapped[list] = mapped_column(ARRAY(Text), default=[])
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+
 async def get_session() -> AsyncSession:
     """Get an async database session."""
     async with async_session() as session:
         yield session
+
+
+async def fetch_content_by_ids(session: AsyncSession, content_ids: list[str]) -> Sequence[ContentItemModel]:
+    """Fetch multiple content items by their UUIDs."""
+    if not content_ids:
+        return []
+    
+    # Convert string IDs to UUID objects
+    uuids = [uuid.UUID(uid) for uid in content_ids]
+    
+    stmt = select(ContentItemModel).where(ContentItemModel.id.in_(uuids))
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
+async def log_pipeline_step(run_id: str, step: str, status: str = "info", message: str = "", duration: Optional[float] = None):
+    """Log a pipeline step to the run metadata."""
+    async with async_session() as session:
+        try:
+            # Use with_for_update to lock the row and prevent race conditions on JSON updates
+            stmt = select(AnalysisRunModel).where(AnalysisRunModel.id == run_id).with_for_update()
+            result = await session.execute(stmt)
+            run = result.scalar_one_or_none()
+            
+            if run:
+                metadata = dict(run.run_metadata or {})
+                logs = list(metadata.get("logs", []))
+                logs.append({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "step": step,
+                    "status": status,
+                    "message": message,
+                    "duration": duration
+                })
+                metadata["logs"] = logs
+                run.run_metadata = metadata
+                # Force update since JSON dict mutation might not be detected
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(run, "run_metadata")
+                await session.commit()
+        except Exception as e:
+            # Don't let logging fail the pipeline
+            print(f"Failed to log pipeline step: {e}")
+

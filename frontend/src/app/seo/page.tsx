@@ -2,17 +2,8 @@
 
 import AppShell from "@/components/AppShell";
 import { Target, ArrowUpRight, BarChart3, TrendingUp, Search as SearchIcon } from "lucide-react";
-
-const SEO_KEYWORDS = [
-    { keyword: "AI code review tools", volume: 8100, difficulty: 34, opportunity: 0.92, intent: "commercial", trend: "up" },
-    { keyword: "best open source LLM", volume: 14500, difficulty: 52, opportunity: 0.78, intent: "informational", trend: "up" },
-    { keyword: "MCP server tutorial", volume: 2400, difficulty: 18, opportunity: 0.95, intent: "informational", trend: "up" },
-    { keyword: "vibe coding explained", volume: 5600, difficulty: 22, opportunity: 0.88, intent: "informational", trend: "up" },
-    { keyword: "RAG pipeline optimization", volume: 3200, difficulty: 41, opportunity: 0.81, intent: "commercial", trend: "stable" },
-    { keyword: "AI agent framework comparison", volume: 4800, difficulty: 38, opportunity: 0.84, intent: "commercial", trend: "up" },
-    { keyword: "local LLM inference setup", volume: 1900, difficulty: 25, opportunity: 0.87, intent: "navigational", trend: "stable" },
-    { keyword: "automated code review benefits", volume: 6700, difficulty: 45, opportunity: 0.72, intent: "informational", trend: "down" },
-];
+import { useState, useEffect } from "react";
+import { fetchTopTrends } from "@/lib/api";
 
 const intentColors: Record<string, string> = {
     informational: "#0ea5e9",
@@ -22,6 +13,35 @@ const intentColors: Record<string, string> = {
 };
 
 export default function SEOPage() {
+    const [keywords, setKeywords] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadData() {
+            setLoading(true);
+            try {
+                const data = await fetchTopTrends(100);
+                // Filter for high volume/high momentum trends suitable for SEO
+                const mapped = data.trends
+                    .filter(t => t.volumeCurrent > 50)
+                    .map(t => ({
+                        keyword: t.keyword,
+                        volume: t.volumeCurrent * 50, // rough estimate multiplier for total search vol
+                        difficulty: Math.round(Math.random() * 60 + 20), // Mock difficulty for now
+                        opportunity: t.confidence,
+                        intent: t.keyword.includes("how") || t.keyword.includes("guide") ? "informational" : "commercial",
+                        trend: t.momentum7d > 0.1 ? "up" : t.momentum7d < -0.1 ? "down" : "stable",
+                    }));
+                setKeywords(mapped);
+            } catch (err) {
+                console.error("Failed to load SEO keywords:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadData();
+    }, []);
+
     return (
         <AppShell>
             <div className="page-header">
@@ -37,24 +57,24 @@ export default function SEOPage() {
             <div className="kpi-grid" style={{ marginBottom: 24 }}>
                 <div className="glass-card" style={{ padding: "16px 20px" }}>
                     <div className="kpi-label">Keywords Found</div>
-                    <div className="kpi-value" style={{ fontSize: "1.6rem" }}>{SEO_KEYWORDS.length}</div>
+                    <div className="kpi-value" style={{ fontSize: "1.6rem" }}>{keywords.length}</div>
                 </div>
                 <div className="glass-card" style={{ padding: "16px 20px" }}>
                     <div className="kpi-label">Avg. Difficulty</div>
                     <div className="kpi-value" style={{ fontSize: "1.6rem", color: "var(--positive)" }}>
-                        {Math.round(SEO_KEYWORDS.reduce((a, k) => a + k.difficulty, 0) / SEO_KEYWORDS.length)}
+                        {keywords.length > 0 ? Math.round(keywords.reduce((a, k) => a + k.difficulty, 0) / keywords.length) : 0}
                     </div>
                 </div>
                 <div className="glass-card" style={{ padding: "16px 20px" }}>
                     <div className="kpi-label">High Opportunity</div>
                     <div className="kpi-value" style={{ fontSize: "1.6rem", color: "var(--accent-1)" }}>
-                        {SEO_KEYWORDS.filter(k => k.opportunity > 0.85).length}
+                        {keywords.filter(k => k.opportunity > 0.85).length}
                     </div>
                 </div>
                 <div className="glass-card" style={{ padding: "16px 20px" }}>
                     <div className="kpi-label">Total Monthly Volume</div>
                     <div className="kpi-value" style={{ fontSize: "1.6rem" }}>
-                        {(SEO_KEYWORDS.reduce((a, k) => a + k.volume, 0) / 1000).toFixed(1)}K
+                        {(keywords.reduce((a, k) => a + k.volume, 0) / 1000).toFixed(1)}K
                     </div>
                 </div>
             </div>
@@ -90,9 +110,15 @@ export default function SEOPage() {
                     <span style={{ textAlign: "center" }}>Trend</span>
                 </div>
 
-                {SEO_KEYWORDS.map((kw) => (
+                {loading && <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)" }}>Loading content...</div>}
+
+                {!loading && keywords.length === 0 && (
+                    <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)" }}>No high-opportunity keywords found yet.</div>
+                )}
+
+                {keywords.map((kw, i) => (
                     <div
-                        key={kw.keyword}
+                        key={`${kw.keyword}-${i}`}
                         className="trend-item"
                         style={{
                             display: "grid",

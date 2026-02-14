@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
     AreaChart,
     Area,
@@ -8,18 +9,8 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Legend,
 } from "recharts";
-
-const DATA = [
-    { day: "Mon", reddit: 120, twitter: 85, youtube: 45 },
-    { day: "Tue", reddit: 145, twitter: 110, youtube: 52 },
-    { day: "Wed", reddit: 138, twitter: 95, youtube: 68 },
-    { day: "Thu", reddit: 180, twitter: 140, youtube: 55 },
-    { day: "Fri", reddit: 165, twitter: 125, youtube: 72 },
-    { day: "Sat", reddit: 210, twitter: 155, youtube: 85 },
-    { day: "Sun", reddit: 195, twitter: 168, youtube: 90 },
-];
+import { fetchDashboardHistory } from "@/lib/api";
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload) return null;
@@ -77,6 +68,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function TrendChart() {
+    const [data, setData] = useState<any[]>([]);
+
+    useEffect(() => {
+        async function loadData() {
+            try {
+                const history = await fetchDashboardHistory();
+                setData(history.timeline);
+            } catch (err) {
+                console.error("Failed to load history:", err);
+            }
+        }
+        loadData();
+    }, []);
+
     return (
         <div className="chart-card">
             <div className="chart-header">
@@ -86,7 +91,7 @@ export default function TrendChart() {
                 </div>
             </div>
             <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={DATA} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
+                <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -20 }}>
                     <defs>
                         <linearGradient id="gradReddit" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="#ff6b35" stopOpacity={0.25} />

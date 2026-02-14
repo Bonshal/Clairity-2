@@ -1,19 +1,42 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { TrendingUp, ArrowUpRight } from "lucide-react";
+import { fetchTopTrends } from "@/lib/api";
 
-const TRENDS = [
-    { rank: 1, keyword: "AI code review tools", direction: "viral", momentum: "+520%", volume: 342 },
-    { rank: 2, keyword: "open-source LLM alternatives", direction: "emerging", momentum: "+180%", volume: 215 },
-    { rank: 3, keyword: "vibe coding workflow", direction: "emerging", momentum: "+145%", volume: 189 },
-    { rank: 4, keyword: "MCP server integrations", direction: "viral", momentum: "+340%", volume: 156 },
-    { rank: 5, keyword: "AI agent frameworks", direction: "emerging", momentum: "+92%", volume: 134 },
-    { rank: 6, keyword: "cursor vs windsurf", direction: "stable", momentum: "+12%", volume: 128 },
-    { rank: 7, keyword: "RAG pipeline optimize", direction: "emerging", momentum: "+78%", volume: 95 },
-    { rank: 8, keyword: "browser automation AI", direction: "declining", momentum: "-15%", volume: 72 },
-];
+type Trend = {
+    rank: number;
+    keyword: string;
+    direction: string;
+    momentum: string;
+    volume: number;
+};
 
 export default function TopTrends() {
+    const [trends, setTrends] = useState<Trend[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadData() {
+            try {
+                const data = await fetchTopTrends(8);
+                const mapped = data.trends.map((t, i) => ({
+                    rank: i + 1,
+                    keyword: t.keyword,
+                    direction: t.direction,
+                    momentum: `+${t.momentum7d.toFixed(0)}%`, // simplified formatting
+                    volume: t.volumeCurrent,
+                }));
+                setTrends(mapped);
+            } catch (err) {
+                console.error("Failed to fetch top trends:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadData();
+    }, []);
+
     return (
         <div className="chart-card">
             <div className="chart-header">
@@ -30,7 +53,12 @@ export default function TopTrends() {
             </div>
 
             <div className="trend-list">
-                {TRENDS.map((t) => (
+                {trends.length === 0 && !loading && (
+                    <div style={{ padding: 20, textAlign: "center", color: "var(--text-secondary)" }}>
+                        No trends detected yet. Run the pipeline to populate data.
+                    </div>
+                )}
+                {trends.map((t) => (
                     <div key={t.rank} className="trend-item">
                         <span className="trend-rank">{t.rank}</span>
                         <span className="trend-keyword">{t.keyword}</span>

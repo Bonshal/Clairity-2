@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nexus AI — Market Intelligence Platform",
+  title: "Clairity — Market Intelligence Platform",
   description:
     "AI-powered market research, trend detection, and content strategy platform. Discover emerging opportunities before your competitors.",
 };

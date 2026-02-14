@@ -1,5 +1,12 @@
 """FastAPI entry point for the Python Analysis Service."""
 
+import sys
+import asyncio
+
+# Fix for Windows asyncio loop policy with httpx/uvicorn
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

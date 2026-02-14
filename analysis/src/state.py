@@ -91,10 +91,10 @@ class Insight(BaseModel):
 class SEOAnalysis(BaseModel):
     primary_keyword: str
     long_tail_keywords: list[str]
-    keyword_intent: Literal["informational", "commercial", "transactional", "navigational"]
+    keyword_intent: str  # informational|commercial|transactional|navigational
     title_variants: list[str]
     meta_description: str
-    estimated_competition: Literal["low", "medium", "high"]
+    estimated_competition: str  # low|medium|high
     seo_score: float
 
 
@@ -112,7 +112,7 @@ class Recommendation(BaseModel):
     title: str
     content_angle: str
     target_audience: str
-    suggested_format: Literal["blog", "video", "infographic", "comparison", "guide", "tool"]
+    suggested_format: str  # blog|video|infographic|comparison|guide|tool
     estimated_effort: Literal["low", "medium", "high"]
     seo: SEOAnalysis
     geo: GEOAnalysis

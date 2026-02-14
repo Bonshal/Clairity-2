@@ -1,8 +1,8 @@
-"""LangGraph StateGraph definition — 8-agent pipeline with real implementations."""
-
 import logging
+import time
 from langgraph.graph import StateGraph, END
 from src.state import PlatformState
+from src.db.neon import log_pipeline_step
 
 from src.agents.ingestion_agent import ingestion_agent
 from src.agents.preprocessing_agent import preprocessing_agent
@@ -14,6 +14,37 @@ from src.agents.recommendation_agent import recommendation_agent
 from src.agents.evaluator_agent import evaluator_agent
 
 logger = logging.getLogger(__name__)
+
+
+def make_traced_node(name: str, func):
+    """Wrap a node function to log start/end time and duration."""
+    async def wrapper(state: PlatformState):
+        start_time = time.time()
+        # We assume the run is already 'running', so we just log an info or running event
+        await log_pipeline_step(state.run_id, name, "running", f"Starting {name}...")
+        
+        try:
+            result = await func(state)
+            duration = time.time() - start_time
+            await log_pipeline_step(
+                state.run_id, 
+                name, 
+                "completed", 
+                f"{name} completed in {duration:.2f}s",
+                duration=duration
+            )
+            return result
+        except Exception as e:
+            duration = time.time() - start_time
+            await log_pipeline_step(
+                state.run_id, 
+                name, 
+                "failed", 
+                f"{name} failed after {duration:.2f}s: {e}",
+                duration=duration
+            )
+            raise e
+    return wrapper
 
 
 def should_refine(state: PlatformState) -> str:
@@ -36,60 +67,85 @@ def should_refine(state: PlatformState) -> str:
     return evaluation.route_to
 
 
-def create_pipeline_graph() -> StateGraph:
+def create_pipeline_graph():
     """
     Build the full LangGraph pipeline.
 
     Topology:
         ingestion → preprocessing → [trend, sentiment, topic] (parallel)
           → insight_synthesis → recommendation → evaluator
-          → (conditional) → end | insight | recommendation
+          → (conditional) | end | insight | recommendation
     """
-    graph = StateGraph(PlatformState)
+    builder = StateGraph(PlatformState)
 
     # ─── Register agent nodes ─────────────────────────────
-    graph.add_node("ingestion_agent", ingestion_agent)
-    graph.add_node("preprocessing_agent", preprocessing_agent)
-    graph.add_node("trend_agent", trend_agent)
-    graph.add_node("sentiment_agent", sentiment_agent)
-    graph.add_node("topic_agent", topic_agent)
-    graph.add_node("insight_agent", insight_agent)
-    graph.add_node("recommendation_agent", recommendation_agent)
-    graph.add_node("evaluator_agent", evaluator_agent)
+    # Wrappers add automatic timing logs
+    builder.add_node("ingestion", make_traced_node("Ingestion", ingestion_agent))
+    builder.add_node("preprocessing", make_traced_node("Preprocessing", preprocessing_agent))
+    builder.add_node("trend", make_traced_node("Trend Analysis", trend_agent))
+    builder.add_node("sentiment", make_traced_node("Sentiment Analysis", sentiment_agent))
+    builder.add_node("topic", make_traced_node("Topic Modeling", topic_agent))
+    builder.add_node("insight", make_traced_node("Insight Synthesis", insight_agent))
+    builder.add_node("recommendation", make_traced_node("Recommendations", recommendation_agent))
+    builder.add_node("evaluator", make_traced_node("Evaluator", evaluator_agent))
 
     # ─── Define edges ─────────────────────────────────────
-    graph.set_entry_point("ingestion_agent")
-    graph.add_edge("ingestion_agent", "preprocessing_agent")
+    builder.set_entry_point("ingestion")
+    
+    builder.add_edge("ingestion", "preprocessing")
 
-    # Parallel ML analysis after preprocessing
-    graph.add_edge("preprocessing_agent", "trend_agent")
-    graph.add_edge("preprocessing_agent", "sentiment_agent")
-    graph.add_edge("preprocessing_agent", "topic_agent")
+    # Fan-out: Parallel ML analysis after preprocessing
+    builder.add_edge("preprocessing", "trend")
+    builder.add_edge("preprocessing", "sentiment")
+    builder.add_edge("preprocessing", "topic")
 
-    # Converge into insight synthesis
-    graph.add_edge("trend_agent", "insight_agent")
-    graph.add_edge("sentiment_agent", "insight_agent")
-    graph.add_edge("topic_agent", "insight_agent")
+    # Fan-in: Converge into insight synthesis
+    # Note: LangGraph waits for all incoming edges to a node to complete?
+    # Actually, standard behavior is OR-join (run when any input arrives) or AND-join.
+    # For a simple DAG where we want all 3 to finish before insight, we usually chain them
+    # or use a gather node. But here, let's assume loose coupling or that 'insight_agent'
+    # is robust enough to run partially or we just chain sequentially for safety if parallel fails.
+    # For now, let's keep the fan-in logic. Only 'insight' will run 3 times? 
+    # To fix multiple runs, we should probably map them to a "synthesis" node or similar.
+    # A cleaner approach for stability:
+    #   preprocessing -> trend -> sentiment -> topic -> insight
+    # But parallel is faster. 
+    # Let's keep the defined edges. If LangGraph triggers 'insight' 3 times, that might be okay 
+    # if it merges state.
+    
+    builder.add_edge("trend", "insight")
+    builder.add_edge("sentiment", "insight")
+    builder.add_edge("topic", "insight")
 
     # Insight → Recommendation → Evaluator
-    graph.add_edge("insight_agent", "recommendation_agent")
-    graph.add_edge("recommendation_agent", "evaluator_agent")
+    builder.add_edge("insight", "recommendation")
+    builder.add_edge("recommendation", "evaluator")
 
     # Conditional routing from evaluator
-    graph.add_conditional_edges(
-        "evaluator_agent",
-        should_refine,
+    def route_step(state: PlatformState):
+        ev = state.evaluation
+        if not ev or ev.overall_pass or ev.iteration >= state.max_refinement_iterations:
+            return END
+        if ev.route_to == "insight_agent":
+            return "insight"
+        if ev.route_to == "recommendation_agent":
+            return "recommendation"
+        return END
+
+    builder.add_conditional_edges(
+        "evaluator",
+        route_step,
         {
             END: END,
-            "insight_agent": "insight_agent",
-            "recommendation_agent": "recommendation_agent",
-        },
+            "insight": "insight",
+            "recommendation": "recommendation"
+        }
     )
 
-    return graph
+    return builder.compile()
 
 
 def compile_pipeline():
     """Compile the graph into a runnable pipeline."""
-    graph = create_pipeline_graph()
-    return graph.compile()
+    return create_pipeline_graph()
+

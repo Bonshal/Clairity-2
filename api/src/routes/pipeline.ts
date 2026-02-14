@@ -2,14 +2,29 @@ import { Router, Request, Response } from "express";
 
 export const pipelineRouter = Router();
 
+const ANALYSIS_SERVICE_URL = process.env.ANALYSIS_SERVICE_URL || "http://127.0.0.1:8000";
+
 // POST /api/pipeline/trigger — Manually trigger full pipeline
-pipelineRouter.post("/trigger", async (_req: Request, res: Response) => {
+pipelineRouter.post("/trigger", async (req: Request, res: Response) => {
     try {
-        // TODO: Push full-pipeline job to BullMQ
-        const runId = `run_${Date.now()}`;
-        res.json({ status: "queued", runId });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to trigger pipeline" });
+        const { niche_id, platforms } = req.body;
+
+        const response = await fetch(`${ANALYSIS_SERVICE_URL}/pipeline/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ niche_id, platforms }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Analysis service error: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json() as any;
+        res.json({ status: "queued", runId: data.run_id });
+    } catch (err: any) {
+        console.error("Pipeline trigger failed:", err);
+        res.status(500).json({ error: "Failed to trigger pipeline", details: err.message });
     }
 });
 
@@ -17,19 +32,39 @@ pipelineRouter.post("/trigger", async (_req: Request, res: Response) => {
 pipelineRouter.get("/status/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
-        // TODO: Query analysis_runs table in Neon
-        res.json({ runId: id, status: "unknown" });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch pipeline status" });
+        const response = await fetch(`${ANALYSIS_SERVICE_URL}/pipeline/status/${id}`);
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                res.status(404).json({ error: "Run not found" });
+                return;
+            }
+            throw new Error(`Analysis status fetch failed: ${response.status}`);
+        }
+
+        const data = await response.json() as any;
+        res.json(data);
+    } catch (err: any) {
+        console.error("Pipeline status fetch failed:", err);
+        res.status(500).json({ error: "Failed to fetch pipeline status", details: err.message });
     }
 });
 
 // GET /api/pipeline/history — Past run history
+// GET /api/pipeline/history — Past run history
 pipelineRouter.get("/history", async (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 20;
     try {
-        res.json({ runs: [], limit });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to fetch pipeline history" });
+        const query = new URLSearchParams(req.query as any).toString();
+        const response = await fetch(`${ANALYSIS_SERVICE_URL}/pipeline/history?${query}`);
+
+        if (!response.ok) {
+            throw new Error(`Analysis history fetch failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        res.json(data);
+    } catch (err: any) {
+        console.error("Pipeline history fetch failed:", err);
+        res.status(500).json({ runs: [] });
     }
 });

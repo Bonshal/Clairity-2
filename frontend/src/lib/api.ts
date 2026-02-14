@@ -45,20 +45,41 @@ export async function fetchDashboardKPIs() {
         totalContent: number;
         emergingTrends: number;
         viralSignals: number;
-        avgEngagement: number;
-        opportunityScore: number;
+        avgSentiment: number;
+        avgEngagement?: number;
+        opportunityScore?: number;
+        activePlatforms?: number;
+        trendCount?: number;
+        sentimentCounts?: { positive: number; neutral: number; negative: number };
+        platformCounts?: Array<{
+            platform: string;
+            count: number;
+            sentiment: number;
+        }>;
     }>("/dashboard/kpis");
 }
 
 export async function fetchDashboardAlerts() {
     return apiFetch<{
         alerts: Array<{
-            type: string;
-            title: string;
-            description: string;
-            timestamp: string;
+            id: string;
+            keyword: string;
+            direction: string;
+            platform: string;
+            detectedAt: string;
         }>;
     }>("/dashboard/alerts");
+}
+
+export async function fetchDashboardHistory() {
+    return apiFetch<{
+        timeline: Array<{
+            day: string;
+            reddit: number;
+            twitter: number;
+            youtube: number;
+        }>;
+    }>("/dashboard/history");
 }
 
 // ─── Trends ─────────────────────────────────────────────────
@@ -226,7 +247,7 @@ export async function fetchGEOAnalysis(recommendationId: string) {
 export async function triggerPipeline(nicheId?: string) {
     return apiFetch<{ runId: string; status: string }>("/pipeline/trigger", {
         method: "POST",
-        body: JSON.stringify({ nicheId }),
+        body: JSON.stringify({ niche_id: nicheId }),
     });
 }
 
@@ -243,6 +264,12 @@ export async function fetchPipelineStatus(runId: string) {
         }>;
         itemsProcessed: number;
         evaluationScore?: number;
+        logs?: Array<{
+            timestamp: string;
+            step: string;
+            status: string;
+            message: string;
+        }>;
     }>(`/pipeline/status/${runId}`);
 }
 

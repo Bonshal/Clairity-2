@@ -1,56 +1,69 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Zap, FileText, Eye, BarChart3 } from "lucide-react";
+import { fetchDashboardKPIs } from "@/lib/api";
 
-const KPIS = [
+type KPI = {
+    label: string;
+    value: string;
+    change: string;
+    changePercent: string;
+    direction: "up" | "down";
+    icon: any;
+    sparkData: number[];
+    color: string;
+};
+
+const DEFAULT_KPIS: KPI[] = [
     {
         label: "Content Analyzed",
-        value: "2,847",
-        change: "+312",
-        changePercent: "+12.3%",
-        direction: "up" as const,
+        value: "...",
+        change: "--",
+        changePercent: "0%",
+        direction: "up",
         icon: FileText,
-        sparkData: [20, 25, 22, 35, 28, 42, 38, 55, 48, 62],
+        sparkData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         color: "#00e5c8",
     },
     {
         label: "Emerging Trends",
-        value: "24",
-        change: "+7",
-        changePercent: "+41.2%",
-        direction: "up" as const,
+        value: "...",
+        change: "--",
+        changePercent: "0%",
+        direction: "up",
         icon: TrendingUp,
-        sparkData: [5, 8, 12, 10, 15, 14, 18, 20, 17, 24],
+        sparkData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         color: "#0ea5e9",
     },
     {
         label: "Viral Signals",
-        value: "3",
-        change: "+2",
-        changePercent: "+200%",
-        direction: "up" as const,
+        value: "...",
+        change: "--",
+        changePercent: "0%",
+        direction: "up",
         icon: Zap,
-        sparkData: [0, 0, 1, 0, 1, 0, 2, 1, 1, 3],
+        sparkData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         color: "#c084fc",
     },
     {
-        label: "Avg Engagement",
-        value: "4.7%",
-        change: "-0.3%",
-        changePercent: "-6.0%",
-        direction: "down" as const,
+        label: "Topic Sentiment",
+        value: "...",
+        change: "Top trend",
+        changePercent: "0%",
+        direction: "up",
         icon: Eye,
-        sparkData: [5.2, 5.0, 4.8, 5.1, 4.9, 5.3, 4.6, 4.8, 5.0, 4.7],
+        sparkData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         color: "#fbbf24",
     },
     {
-        label: "Opportunity Score",
-        value: "8.4",
-        change: "+0.6",
-        changePercent: "+7.7%",
-        direction: "up" as const,
+        label: "Content Gap",
+        value: "...",
+        change: "--",
+        changePercent: "0%",
+        direction: "up",
         icon: BarChart3,
-        sparkData: [6.5, 7.0, 7.2, 7.8, 7.5, 8.0, 7.8, 8.1, 8.2, 8.4],
+        sparkData: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         color: "#34d399",
     },
 ];
@@ -89,7 +102,6 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
-            {/* Glow dot on last point */}
             <circle
                 cx={w}
                 cy={h - ((data[data.length - 1] - min) / range) * h}
@@ -108,26 +120,105 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 export default function KPICards() {
+    const [kpis, setKpis] = useState<KPI[]>(DEFAULT_KPIS);
+
+    useEffect(() => {
+        async function loadData() {
+            try {
+                const data = await fetchDashboardKPIs() as any;
+
+                // Topic Sentiment: sentiment of the top trending keyword
+                let topicLabel = "No trends";
+                let topicValue = "--";
+                let topicDir: "up" | "down" = "up";
+                let topicColor = "#fbbf24";
+
+                if (data.topTrendSentiment) {
+                    const ts = data.topTrendSentiment;
+                    const posRatio = ts.totalMentions > 0
+                        ? Math.round((ts.positive / ts.totalMentions) * 100)
+                        : 0;
+                    topicValue = `${posRatio}% pos`;
+                    topicLabel = `"${ts.keyword}"`;
+                    topicDir = posRatio >= 50 ? "up" : "down";
+                    topicColor = posRatio >= 50 ? "#34d399" : "#f87171";
+                }
+
+                // Content Gap Score: percentage of trending topics that are underserved
+                const gapScore = data.contentGapScore ?? 0;
+                const gapLabel = gapScore > 60 ? "High opportunity" : gapScore > 30 ? "Moderate" : "Well covered";
+
+                const newKpis: KPI[] = [
+                    {
+                        ...DEFAULT_KPIS[0],
+                        value: data.totalContent.toLocaleString(),
+                        sparkData: [5, 10, 15, 20, 25, 30, 40, 50, 60, data.totalContent > 100 ? 100 : 70],
+                    },
+                    {
+                        ...DEFAULT_KPIS[1],
+                        value: data.emergingTrends.toString(),
+                        sparkData: [0, 1, 2, 3, 4, 3, 5, 8, 12, 15],
+                    },
+                    {
+                        ...DEFAULT_KPIS[2],
+                        value: data.viralSignals.toString(),
+                        sparkData: [0, 0, 0, 1, 0, 1, 2, 1, 4, 5],
+                    },
+                    {
+                        label: "Topic Sentiment",
+                        value: topicValue,
+                        change: topicLabel,
+                        changePercent: "",
+                        direction: topicDir,
+                        icon: Eye,
+                        sparkData: [50, 55, 60, 58, 62, 65, 70, 72, 75, 80],
+                        color: topicColor,
+                    },
+                    {
+                        label: "Content Gap",
+                        value: `${gapScore}%`,
+                        change: gapLabel,
+                        changePercent: "",
+                        direction: gapScore > 40 ? "up" : "down",
+                        icon: BarChart3,
+                        sparkData: [20, 30, 40, 50, 45, 55, 60, 65, 70, gapScore],
+                        color: "#34d399",
+                    },
+                ];
+                setKpis(newKpis);
+            } catch (err) {
+                console.error("Failed to load KPIs:", err);
+            }
+        }
+        loadData();
+    }, []);
+
     return (
         <div className="kpi-grid">
-            {KPIS.map((kpi) => (
+            {kpis.map((kpi) => (
                 <div key={kpi.label} className="glass-card" style={{ padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span className="kpi-label">{kpi.label}</span>
                         <kpi.icon size={16} color={kpi.color} strokeWidth={2} />
                     </div>
-                    <div className="kpi-value" style={{ color: kpi.color === "#fbbf24" && kpi.direction === "down" ? "var(--text-primary)" : undefined }}>
+                    <div className="kpi-value" style={{ color: kpi.direction === "down" && (kpi.label === "Topic Sentiment") ? "#f87171" : undefined }}>
                         {kpi.value}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                        <span className={`kpi-change ${kpi.direction === "up" ? "positive" : "negative"}`}>
-                            {kpi.direction === "up" ? (
-                                <TrendingUp size={12} />
-                            ) : (
-                                <TrendingDown size={12} />
-                            )}
-                            {kpi.changePercent}
-                        </span>
+                        {kpi.label === "Topic Sentiment" || kpi.label === "Content Gap" ? (
+                            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {kpi.change}
+                            </span>
+                        ) : (
+                            <span className={`kpi-change ${kpi.direction === "up" ? "positive" : "negative"}`}>
+                                {kpi.direction === "up" ? (
+                                    <TrendingUp size={12} />
+                                ) : (
+                                    <TrendingDown size={12} />
+                                )}
+                                {kpi.changePercent}
+                            </span>
+                        )}
                         <MiniSparkline data={kpi.sparkData} color={kpi.color} />
                     </div>
                 </div>

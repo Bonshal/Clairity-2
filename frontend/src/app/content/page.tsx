@@ -2,7 +2,8 @@
 
 import AppShell from "@/components/AppShell";
 import { Search, Filter, ExternalLink, ThumbsUp, MessageSquare, Eye, Zap } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchContent, semanticSearch } from "@/lib/api";
 
 const CONTENT_ITEMS = [
     {
@@ -75,6 +76,58 @@ const CONTENT_ITEMS = [
 
 export default function ContentPage() {
     const [searchQuery, setSearchQuery] = useState("");
+    const [platformFilter, setPlatformFilter] = useState("all");
+    const [items, setItems] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadContent() {
+            setLoading(true);
+            try {
+                if (searchQuery.length > 2) {
+                    const res = await semanticSearch(searchQuery);
+                    // Map semantic search results
+                    const mapped = res.results.map((item: any) => ({
+                        id: item.id,
+                        title: item.title,
+                        platform: item.platform,
+                        author: item.author || "Unknown",
+                        date: "Just now", // Search doesn't usually return date, assume recent or fix in API
+                        sentiment: item.sentiment || "neutral",
+                        engagement: { upvotes: 0, comments: 0 }, // Search result might lack metrics
+                        topics: [],
+                        isOutlier: false,
+                    }));
+                    setItems(mapped);
+                } else {
+                    const res = await fetchContent(1, 20, platformFilter === "all" ? undefined : platformFilter);
+                    const mapped = res.items.map((item: any) => ({
+                        id: item.id,
+                        title: item.title || item.body?.slice(0, 80) + "...",
+                        platform: item.platform,
+                        author: item.author || "Unknown",
+                        date: new Date(item.fetchedAt).toLocaleDateString(),
+                        sentiment: item.sentimentResults?.[0]?.sentiment || "neutral",
+                        engagement: {
+                            upvotes: item.upvotes || item.likes || 0,
+                            comments: item.commentsCount || 0
+                        },
+                        topics: item.topics || [], // API response doesn't have topics on item directly yet, assume empty or fix API
+                        isOutlier: false,
+                    }));
+                    setItems(mapped);
+                }
+            } catch (err) {
+                console.error("Failed to fetch content:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Debounce search slightly
+        const timer = setTimeout(loadContent, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery, platformFilter]);
 
     return (
         <AppShell>
@@ -83,7 +136,7 @@ export default function ContentPage() {
                     Content <span className="gradient-text">Explorer</span>
                 </h2>
                 <p className="page-subtitle">
-                    Browse, search, and analyze {CONTENT_ITEMS.length.toLocaleString()} indexed items across all platforms
+                    Browse, search, and analyze indexed items across all platforms
                 </p>
             </div>
 
@@ -125,14 +178,31 @@ export default function ContentPage() {
                         }}
                     />
                 </div>
-                <button className="btn btn-ghost">
-                    <Filter size={16} /> Filters
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                    {["all", "reddit", "twitter", "youtube"].map((p) => (
+                        <button
+                            key={p}
+                            className={`btn ${platformFilter === p ? "btn-primary" : "btn-ghost"}`}
+                            onClick={() => setPlatformFilter(p)}
+                            style={{ textTransform: "capitalize" }}
+                        >
+                            {p}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Content list */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {CONTENT_ITEMS.map((item) => (
+                {loading && <div style={{ padding: 20, textAlign: "center", color: "var(--text-muted)" }}>Loading content...</div>}
+
+                {!loading && items.length === 0 && (
+                    <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
+                        No content found. Try adjusting filters or search.
+                    </div>
+                )}
+
+                {items.map((item) => (
                     <div
                         key={item.id}
                         className="glass-card"
@@ -145,7 +215,7 @@ export default function ContentPage() {
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span className={`tag tag-platform ${item.platform}`}>
+                            <span className={`tag tag-platform ${item.platform.toLowerCase()}`}>
                                 {item.platform === "twitter" ? "X" : item.platform}
                             </span>
                             <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
@@ -212,7 +282,7 @@ export default function ContentPage() {
                             </div>
 
                             <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-                                {item.topics.map((t) => (
+                                {item.topics.map((t: string) => (
                                     <span key={t} className="tag">{t}</span>
                                 ))}
                             </div>
