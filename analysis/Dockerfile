@@ -27,11 +27,6 @@ COPY src/ ./src/
 # (We must install pip first because uv environments intentionally exclude pip to save space, but spacy requires it)
 RUN uv pip install pip && uv run python -m spacy download en_core_web_sm
 
-# Run as non-root
-# (Do NOT use 'chown -R' here! It duplicates the massive PyTorch/Transformers .venv layer and fills the disk)
-RUN useradd -m appuser && chown appuser /app
-USER appuser
-
 EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
 
