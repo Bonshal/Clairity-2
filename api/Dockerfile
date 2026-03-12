@@ -1,6 +1,11 @@
 # ─── Stage 1: Base ──────────────────────────────────────────
-FROM node:20-alpine AS base
+FROM node:20-slim AS base
 WORKDIR /app
+
+# Install OpenSSL (required by Prisma's Rust query engine on Debian/slim)
+RUN apt-get update -y && \
+    apt-get install -y openssl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy manifests first (better layer caching)
 COPY package*.json ./
@@ -26,8 +31,8 @@ RUN npx prisma generate && npx tsc
 # Prune dev dependencies after build
 RUN npm prune --production
 
-# Run as non-root
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Run as non-root (Debian uses different groupadd commands than Alpine)
+RUN groupadd -r appgroup && useradd -r -g appgroup -s /bin/false appuser
 USER appuser
 
 EXPOSE 3001
