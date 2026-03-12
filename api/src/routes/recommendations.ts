@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../services/neon";
+import { prisma, withRetry } from "../services/neon";
 
 export const recommendationsRouter = Router();
 
@@ -12,21 +12,59 @@ recommendationsRouter.get("/", async (req: Request, res: Response) => {
     const skip = (page - 1) * limit;
 
     try {
-        const [recommendations, total] = await Promise.all([
+        const [recommendations, total] = await withRetry(() => Promise.all([
             prisma.recommendation.findMany({
                 skip,
                 take: limit,
                 orderBy: { createdAt: "desc" },
             }),
             prisma.recommendation.count(),
-        ]);
+        ]));
 
-        res.json({ recommendations, page, limit, total });
+        // Transform DB rows into the shape the frontend expects
+        const mapped = recommendations.map((r) => {
+            const geo = (r.geoOptimization as any) || {};
+            const meta = (r.sourceInsights as any) || {};
+            return {
+                id: r.id,
+                title: r.title,
+                contentAngle: r.contentAngle,
+                targetAudience: meta.target_audience || null,
+                suggestedFormat: meta.suggested_format || null,
+                estimatedEffort: meta.estimated_effort || null,
+                confidence: r.confidence,
+                reasoning: r.reasoning,
+                seo: {
+                    primaryKeyword: r.targetKeywords?.[r.targetKeywords.length - 1] || null,
+                    longTailKeywords: r.targetKeywords?.slice(0, -1) || [],
+                    keywordIntent: r.keywordIntent,
+                    titleVariants: meta.title_variants || [],
+                    metaDescription: meta.meta_description || null,
+                    estimatedCompetition: meta.estimated_competition || null,
+                    seoScore: r.seoScore,
+                },
+                geo: {
+                    keyEntities: geo.key_entities || [],
+                    citationWorthyClaims: geo.citation_worthy_claims || 0,
+                    recommendedStructure: geo.recommended_structure || null,
+                    faqSuggestions: geo.faq_suggestions || [],
+                    schemaMarkup: geo.schema_markup || [],
+                    geoScore: geo.geo_score || null,
+                },
+                sourceTrends: r.sourceTrends || [],
+                sourcePlatforms: meta.source_platforms || [],
+                analysisRunId: r.analysisRunId,
+                createdAt: r.createdAt,
+            };
+        });
+
+        res.json({ recommendations: mapped, page, limit, total });
     } catch (err: any) {
         console.error("Failed to fetch recommendations:", err);
         res.status(500).json({ error: "Failed to fetch recommendations", details: err.message });
     }
 });
+
 
 // GET /api/recommendations/:id — Recommendation detail
 recommendationsRouter.get("/:id", async (req: Request, res: Response) => {

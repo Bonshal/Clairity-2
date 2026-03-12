@@ -3,7 +3,6 @@
 from datetime import datetime
 from typing import Optional
 import logging
-from src.ingestion.reddit import _normalize_item
 
 logger = logging.getLogger(__name__)
 
@@ -74,29 +73,43 @@ def normalize_youtube_data(raw_items: list[dict]) -> list[dict]:
     return items
 
 def normalize_reddit_data(raw_items: list[dict]) -> list[dict]:
-    """Normalize raw Reddit Apify data."""
+    """Normalize Reddit data from MongoDB.
+    
+    IMPORTANT: The data in MongoDB is ALREADY normalized by fetch_reddit_data()
+    (which calls _normalize_item internally). The items have keys like:
+      external_id, text_content, data_type, body, title, upvotes, etc.
+    
+    We just need to map those keys to our preprocessing schema.
+    We do NOT call _normalize_item again (that expects raw Apify keys).
+    """
     items = []
     for raw in raw_items:
         try:
-            norm = _normalize_item(raw)
-            if not norm:
+            # The data is already normalized — just map to preprocessing schema
+            text_content = raw.get("text_content", "") or ""
+            title = raw.get("title", "") or ""
+            body = raw.get("body", "") or ""
+            external_id = raw.get("external_id", "") or ""
+            
+            # Skip items with no text at all
+            if not text_content and not title and not body:
                 continue
 
             items.append({
                 "platform": "reddit",
-                "platform_id": norm.get("external_id"),
-                "content_type": norm.get("data_type", "post"),
-                "title": norm.get("title"),
-                "body": norm.get("body"),
-                "text": norm.get("text_content"),  # used for cleaning
-                "author": norm.get("author"),
-                "url": norm.get("url"),
-                "upvotes": norm.get("upvotes", 0),
-                "likes": norm.get("upvotes", 0),
+                "platform_id": external_id,
+                "content_type": raw.get("data_type", "post"),
+                "title": title,
+                "body": body,
+                "text": text_content or f"{title}\n\n{body}".strip(),
+                "author": raw.get("author", ""),
+                "url": raw.get("url", ""),
+                "upvotes": raw.get("upvotes", 0) or 0,
+                "likes": raw.get("upvotes", 0) or 0,
                 "views": 0,
-                "comments_count": norm.get("comment_count", 0),
+                "comments_count": raw.get("comment_count", 0) or 0,
                 "shares": 0,
-                "platform_created_at": norm.get("created_at"), # datetime or string? _normalize_post_fast returns isoformat string.
+                "platform_created_at": raw.get("created_at"),
             })
         except Exception as e:
             logger.error(f"Failed to normalize reddit item: {e}")

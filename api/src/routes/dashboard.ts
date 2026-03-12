@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../services/neon";
+import { prisma, withRetry } from "../services/neon";
 import { Prisma } from "@prisma/client";
 
 export const dashboardRouter = Router();
@@ -16,7 +16,7 @@ dashboardRouter.get("/kpis", async (_req: Request, res: Response) => {
             sentimentGroups,
             trendGroups,
             topTrends,
-        ] = await Promise.all([
+        ] = await withRetry(() => Promise.all([
             prisma.contentItem.count(),
             prisma.trendSignal.count(),
             prisma.sentimentResult.aggregate({
@@ -50,7 +50,7 @@ dashboardRouter.get("/kpis", async (_req: Request, res: Response) => {
                 orderBy: { momentum7d: "desc" },
                 where: { direction: { in: ["emerging", "viral"] } },
             }),
-        ]);
+        ]));
 
         const avgSentiment = sentimentAgg._avg.sentimentScore || 0;
         const lastIngestion = lastItem?.fetchedAt || null;

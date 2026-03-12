@@ -11,7 +11,8 @@ import uuid
 from datetime import datetime, timezone
 
 from src.state import PlatformState, TrendSignal as TrendSignalState, PlatformEnum
-from src.ml.trends import detect_trends
+from src.ml.trends import detect_trends, clean_text, extract_candidates_semantic
+from src.llm.wrapper import refine_trend_labels
 from src.db.neon import async_session, fetch_content_by_ids, TrendSignalModel, NicheModel, log_pipeline_step
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,8 @@ async def trend_agent(state: PlatformState) -> dict:
             async with async_session() as session:
                 niche = await session.get(NicheModel, niche_uuid)
                 if niche and niche.keywords:
-                    niche_keywords = niche.keywords
+                    # Filter out empty strings
+                    niche_keywords = [k for k in niche.keywords if k.strip()]
                     logger.info(f"[Trend Agent] Using niche keywords: {niche_keywords}")
         except (ValueError, Exception) as e:
             logger.warning(f"[Trend Agent] Could not resolve niche: {e}")
@@ -70,7 +72,9 @@ async def trend_agent(state: PlatformState) -> dict:
                     "id": str(item.id),
                     "platform": item.platform,
                     "cleaned_text": item.body or item.title or "",
-                    "platform_created_at": item.fetched_at,
+                    # Use the actual post date for trend momentum calculations.
+                    # Falls back to fetched_at only if platform_created_at is NULL.
+                    "platform_created_at": item.platform_created_at or item.fetched_at,
                     "engagement": (item.likes or 0) + (item.shares or 0) + (item.comments_count or 0)
                 })
                 
@@ -88,11 +92,37 @@ async def trend_agent(state: PlatformState) -> dict:
         logger.warning("[Trend Agent] No items found in DB (despite IDs existing)")
         return { "trend_signals": [], "emerging_count": 0, "declining_count": 0, "viral_count": 0 }
 
-    # 4. Run trend detection with niche keywords
+    # 4. Hybrid Trend Extraction Pipeline
+    # A. Clean texts for ML processing
+    cleaned_texts = []
+    for item in all_items:
+        raw = item.get("cleaned_text", "")
+        if len(raw) > 15:
+            cleaned_texts.append(clean_text(raw))
+    
+    # B. Extract statistical candidates (The "Grounding" Layer)
+    candidates = extract_candidates_semantic(cleaned_texts, top_n=60)
+    logger.info(f"[Trend Agent] Extracted {len(candidates)} Semantic candidates: {candidates[:5]}...")
+    await log_pipeline_step(
+        state.run_id, "Trend Analysis", "running", 
+        f"Step 1: Extracted {len(candidates)} candidates via KeyBERT/SpaCy (e.g., {', '.join(candidates[:3])})"
+    )
+
+    # C. Refine via LLM (The "Polish" Layer)
+    refined_keywords = await refine_trend_labels(candidates)
+    if refined_keywords != candidates:
+        logger.info(f"[Trend Agent] LLM refined keywords: {refined_keywords[:5]}...")
+        await log_pipeline_step(
+            state.run_id, "Trend Analysis", "running", 
+            f"Step 2: Refined {len(refined_keywords)} trends via LLM"
+        )
+    
+    # D. Compute Trend Metrics (Momentum, Z-Score) on refined keywords
     results = detect_trends(
         all_items, 
         text_field="cleaned_text", 
         time_field="platform_created_at",
+        keywords=refined_keywords,
         niche_keywords=niche_keywords,
     )
 

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../services/neon";
+import { prisma, withRetry } from "../services/neon";
 import { Prisma } from "@prisma/client";
 
 export const contentRouter = Router();
@@ -19,7 +19,7 @@ contentRouter.get("/", async (req: Request, res: Response) => {
     }
 
     try {
-        const [items, total] = await Promise.all([
+        const [items, total] = await withRetry(() => Promise.all([
             prisma.contentItem.findMany({
                 where,
                 skip,
@@ -28,7 +28,7 @@ contentRouter.get("/", async (req: Request, res: Response) => {
                 include: { sentimentResults: true },
             }),
             prisma.contentItem.count({ where }),
-        ]);
+        ]));
 
         // Convert BigInt to string for JSON serialization
         const safeItems = items.map(item => ({

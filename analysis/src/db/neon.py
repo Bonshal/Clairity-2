@@ -94,6 +94,25 @@ class TrendSignalModel(Base):
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
 
+class RecommendationModel(Base):
+    __tablename__ = "recommendations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(Text)
+    content_angle: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    target_keywords: Mapped[list] = mapped_column(ARRAY(Text), default=[])
+    keyword_intent: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    seo_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    geo_optimization: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_trends: Mapped[list] = mapped_column(ARRAY(Text), default=[])
+    source_insights: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    evaluation_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    analysis_run_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+
 class AnalysisRunModel(Base):
     __tablename__ = "analysis_runs"
 

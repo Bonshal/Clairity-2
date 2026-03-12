@@ -168,7 +168,7 @@ class PlatformState(BaseModel):
 
     evaluation: Optional[EvaluationResult] = None
     evaluation_history: list[EvaluationResult] = []
-    max_refinement_iterations: int = 2
+    max_refinement_iterations: int = 0
 
     # Pipeline metadata
     started_at: datetime = Field(default_factory=datetime.utcnow)

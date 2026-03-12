@@ -1,0 +1,19 @@
+BENCHMARK SCORES
+================================================================================
+
+Technique                  Specificity    Junk%   NicheSim   HumanQ    SCORE
+---------------------------------------------------------------------------
+1. TF-IDF bigrams                100%      0%      0.66    100%    0.90
+2. YAKE statistical              100%      0%      0.40    100%    0.82
+4. KeyBERT semantic              100%      0%      0.35     95%    0.79
+5. BERTopic clusters             100%      0%      0.30    100%    0.79
+---------------------------------------------------------------------------
+
+WINNER: 1. TF-IDF bigrams (score: 0.90)
+
+Metrics explanation:
+  Specificity: % multi-word phrases (higher = more descriptive)
+  Junk%: % single generic words (lower = better)
+  NicheSim: Avg semantic similarity to niche terms (higher = more relevant)
+  HumanQ: % keywords a human would find useful as dashboard labels (higher = better)
+  SCORE: Weighted composite (higher = better)

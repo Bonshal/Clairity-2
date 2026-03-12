@@ -64,7 +64,8 @@ pipelineRouter.get("/history", async (req: Request, res: Response) => {
         const data = await response.json();
         res.json(data);
     } catch (err: any) {
-        console.error("Pipeline history fetch failed:", err);
+        console.error(`Pipeline history fetch failed from ${ANALYSIS_SERVICE_URL}:`, err.message);
         res.status(500).json({ runs: [] });
+
     }
 });

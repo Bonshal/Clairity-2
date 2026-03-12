@@ -10,6 +10,8 @@ from src.state import (
     PlatformState, Recommendation, SEOAnalysis, GEOAnalysis,
 )
 from src.config import settings
+from src.llm.wrapper import get_random_api_key
+from src.db.neon import async_session, RecommendationModel, log_pipeline_step
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ logger = logging.getLogger(__name__)
 def _get_llm():
     return ChatGoogleGenerativeAI(
         model=settings.gemini_flash_model,
-        google_api_key=settings.google_api_key,
+        google_api_key=get_random_api_key() or settings.google_api_key,
         temperature=0.4,
     )
 
@@ -130,6 +132,60 @@ async def recommendation_agent(state: PlatformState) -> dict:
                 logger.warning(f"Failed to parse recommendation: {e}")
 
         logger.info(f"[Recommendation Agent] Generated {len(recommendations)} recommendations")
+        await log_pipeline_step(
+            state.run_id, "Recommendations", "running",
+            f"Generated {len(recommendations)} recommendations — persisting to DB..."
+        )
+
+        # ─── Persist to database ───────────────────────────────────────
+        if recommendations:
+            db_models = []
+            for rec in recommendations:
+                db_models.append(RecommendationModel(
+                    id=uuid.uuid4(),
+                    title=rec.title,
+                    content_angle=rec.content_angle,
+                    target_keywords=rec.seo.long_tail_keywords + [rec.seo.primary_keyword],
+                    keyword_intent=rec.seo.keyword_intent,
+                    seo_score=rec.seo.seo_score,
+                    geo_optimization={
+                        "key_entities": rec.geo.key_entities,
+                        "citation_worthy_claims": rec.geo.citation_worthy_claims,
+                        "recommended_structure": rec.geo.recommended_structure,
+                        "faq_suggestions": rec.geo.faq_suggestions,
+                        "schema_markup": rec.geo.schema_markup,
+                        "geo_score": rec.geo.geo_score,
+                    },
+                    confidence=rec.confidence,
+                    reasoning=rec.reasoning,
+                    source_trends=rec.source_trends,  # keyword strings
+                    source_insights={
+                        "target_audience": rec.target_audience,
+                        "suggested_format": rec.suggested_format,
+                        "estimated_effort": rec.estimated_effort,
+                        "source_platforms": rec.source_platforms,
+                        "title_variants": rec.seo.title_variants,
+                        "meta_description": rec.seo.meta_description,
+                        "estimated_competition": rec.seo.estimated_competition,
+                    },
+                    analysis_run_id=state.run_id,
+                ))
+
+            try:
+                async with async_session() as session:
+                    session.add_all(db_models)
+                    await session.commit()
+                logger.info(f"[Recommendation Agent] Persisted {len(db_models)} recommendations to DB")
+                await log_pipeline_step(
+                    state.run_id, "Recommendations", "completed",
+                    f"Saved {len(db_models)} recommendations to database"
+                )
+            except Exception as e:
+                logger.error(f"[Recommendation Agent] DB persist failed: {e}", exc_info=True)
+                await log_pipeline_step(
+                    state.run_id, "Recommendations", "warning",
+                    f"Recommendations generated but DB write failed: {e}"
+                )
 
         return {"recommendations": recommendations}
 

@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from src.state import PlatformState, EvaluationResult
 from src.config import settings
+from src.llm.wrapper import get_random_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 def _get_llm():
     return ChatGoogleGenerativeAI(
         model=settings.gemini_lite_model,
-        google_api_key=settings.google_api_key,
+        google_api_key=get_random_api_key() or settings.google_api_key,
         temperature=0.1,  # Low temp for evaluation consistency
     )
 

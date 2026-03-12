@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     youtube_api_key: str
 
     # ─── LLM APIs ─────────────────────────────────────────
-    google_api_key: str
+    gemini_api_keys: Optional[str] = None
+    google_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
 

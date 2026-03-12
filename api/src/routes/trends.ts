@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../services/neon";
+import { prisma, withRetry } from "../services/neon";
 
 export const trendsRouter = Router();
 
@@ -18,11 +18,11 @@ trendsRouter.delete("/flush", async (_req: Request, res: Response) => {
 trendsRouter.get("/top", async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     try {
-        const trends = await prisma.trendSignal.findMany({
+        const trends = await withRetry(() => prisma.trendSignal.findMany({
             orderBy: { momentum7d: "desc" },
             take: limit,
             include: { topicCluster: true }, // Include topic info if needed
-        });
+        }));
         res.json({ trends, limit });
     } catch (err: any) {
         console.error("Failed to fetch top trends:", err);
