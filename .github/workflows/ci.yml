@@ -109,6 +109,7 @@ jobs:
           script: |
             cd ~/Clairity-2
             git pull origin main
+            docker compose down --remove-orphans
             docker compose build
             docker compose up -d
             docker compose exec -T node-api npx prisma db push --skip-generate || true
