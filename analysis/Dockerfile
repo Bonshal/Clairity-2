@@ -28,7 +28,8 @@ COPY src/ ./src/
 RUN uv pip install pip && uv run python -m spacy download en_core_web_sm
 
 # Run as non-root
-RUN useradd -m appuser && chown -R appuser /app
+# (Do NOT use 'chown -R' here! It duplicates the massive PyTorch/Transformers .venv layer and fills the disk)
+RUN useradd -m appuser && chown appuser /app
 USER appuser
 
 EXPOSE 8000
