@@ -9,9 +9,9 @@ trendsRouter.delete("/flush", async (_req: Request, res: Response) => {
         const result = await prisma.trendSignal.deleteMany();
         console.log(`Flushed ${result.count} stale trend signals`);
         res.json({ message: `Cleared ${result.count} old trend signals`, count: result.count });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to flush trends:", err);
-        res.status(500).json({ error: "Failed to flush trends", details: err.message });
+        res.status(500).json({ error: "Failed to flush trends", details: err instanceof Error ? err.message : String(err) });
     }
 });
 // GET /api/trends/top — Top trending keywords
@@ -24,9 +24,9 @@ trendsRouter.get("/top", async (req: Request, res: Response) => {
             include: { topicCluster: true }, // Include topic info if needed
         }));
         res.json({ trends, limit });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch top trends:", err);
-        res.status(500).json({ error: "Failed to fetch top trends", details: err.message });
+        res.status(500).json({ error: "Failed to fetch top trends", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -47,16 +47,16 @@ trendsRouter.get("/timeline", async (req: Request, res: Response) => {
         `;
 
         // Convert BigInt counts to number if necessary (Prisma returns BigInt for count in raw)
-        const timeline = (result as any[]).map(row => ({
+        const timeline = (result as { date: Date; count: bigint; avg_confidence: number | null }[]).map(row => ({
             date: row.date,
             count: Number(row.count),
             avgConfidence: row.avg_confidence
         }));
 
         res.json({ timeline, days });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch timeline:", err);
-        res.status(500).json({ error: "Failed to fetch timeline", details: err.message });
+        res.status(500).json({ error: "Failed to fetch timeline", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -89,8 +89,8 @@ trendsRouter.get("/:keyword", async (req: Request, res: Response) => {
         });
 
         res.json({ keyword, trend, relatedContent });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch trend detail:", err);
-        res.status(500).json({ error: "Failed to fetch trend detail", details: err.message });
+        res.status(500).json({ error: "Failed to fetch trend detail", details: err instanceof Error ? err.message : String(err) });
     }
 });

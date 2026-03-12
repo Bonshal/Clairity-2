@@ -30,7 +30,8 @@ export async function withRetry<T>(
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             return await fn();
-        } catch (err: any) {
+        } catch (error: unknown) {
+            const err = error as { code?: string; message?: string };
             const retryable =
                 err?.code === "P1001" ||
                 err?.code === "P2024" ||
@@ -43,7 +44,7 @@ export async function withRetry<T>(
                 );
                 await new Promise((r) => setTimeout(r, delay));
             } else {
-                throw err;
+                throw error;
             }
         }
     }

@@ -12,7 +12,7 @@ import { geoRouter } from "./routes/geo";
 import { contentRouter } from "./routes/content";
 import { nichesRouter } from "./routes/niches";
 import { pipelineRouter } from "./routes/pipeline";
-import { initWebSocket, getIO } from "./services/websocket";
+import { initWebSocket } from "./services/websocket";
 
 dotenv.config();
 

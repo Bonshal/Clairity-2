@@ -37,9 +37,9 @@ contentRouter.get("/", async (req: Request, res: Response) => {
         }));
 
         res.json({ items: safeItems, page, limit, total, platform: platform || "all" });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch content:", err);
-        res.status(500).json({ error: "Failed to fetch content", details: err.message });
+        res.status(500).json({ error: "Failed to fetch content", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -60,11 +60,11 @@ contentRouter.get("/search", async (req: Request, res: Response) => {
             throw new Error(`Search service error: ${response.status} ${errorText}`);
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as unknown;
         res.json(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to search content:", err);
-        res.status(500).json({ error: "Failed to search content", details: err.message });
+        res.status(500).json({ error: "Failed to search content", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -86,8 +86,8 @@ contentRouter.get("/outliers", async (_req: Request, res: Response) => {
         }));
 
         res.json({ outliers: safeOutliers });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch outliers:", err);
-        res.status(500).json({ error: "Failed to fetch outliers", details: err.message });
+        res.status(500).json({ error: "Failed to fetch outliers", details: err instanceof Error ? err.message : String(err) });
     }
 });

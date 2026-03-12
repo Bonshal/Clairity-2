@@ -20,11 +20,11 @@ pipelineRouter.post("/trigger", async (req: Request, res: Response) => {
             throw new Error(`Analysis service error: ${response.status} ${errorText}`);
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as { run_id: string };
         res.json({ status: "queued", runId: data.run_id });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Pipeline trigger failed:", err);
-        res.status(500).json({ error: "Failed to trigger pipeline", details: err.message });
+        res.status(500).json({ error: "Failed to trigger pipeline", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -42,11 +42,11 @@ pipelineRouter.get("/status/:id", async (req: Request, res: Response) => {
             throw new Error(`Analysis status fetch failed: ${response.status}`);
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as unknown;
         res.json(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Pipeline status fetch failed:", err);
-        res.status(500).json({ error: "Failed to fetch pipeline status", details: err.message });
+        res.status(500).json({ error: "Failed to fetch pipeline status", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -54,7 +54,7 @@ pipelineRouter.get("/status/:id", async (req: Request, res: Response) => {
 // GET /api/pipeline/history — Past run history
 pipelineRouter.get("/history", async (req: Request, res: Response) => {
     try {
-        const query = new URLSearchParams(req.query as any).toString();
+        const query = new URLSearchParams(req.query as Record<string, string>).toString();
         const response = await fetch(`${ANALYSIS_SERVICE_URL}/pipeline/history?${query}`);
 
         if (!response.ok) {
@@ -63,8 +63,8 @@ pipelineRouter.get("/history", async (req: Request, res: Response) => {
 
         const data = await response.json();
         res.json(data);
-    } catch (err: any) {
-        console.error(`Pipeline history fetch failed from ${ANALYSIS_SERVICE_URL}:`, err.message);
+    } catch (err: unknown) {
+        console.error(`Pipeline history fetch failed from ${ANALYSIS_SERVICE_URL}:`, err instanceof Error ? err.message : String(err));
         res.status(500).json({ runs: [] });
 
     }

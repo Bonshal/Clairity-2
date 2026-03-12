@@ -23,8 +23,8 @@ recommendationsRouter.get("/", async (req: Request, res: Response) => {
 
         // Transform DB rows into the shape the frontend expects
         const mapped = recommendations.map((r) => {
-            const geo = (r.geoOptimization as any) || {};
-            const meta = (r.sourceInsights as any) || {};
+            const geo = (r.geoOptimization as { key_entities?: string[]; citation_worthy_claims?: number; recommended_structure?: string; faq_suggestions?: string[]; schema_markup?: string[]; geo_score?: number }) || {};
+            const meta = (r.sourceInsights as { target_audience?: string; suggested_format?: string; estimated_effort?: string; title_variants?: string[]; meta_description?: string; estimated_competition?: string; source_platforms?: string[] }) || {};
             return {
                 id: r.id,
                 title: r.title,
@@ -59,9 +59,9 @@ recommendationsRouter.get("/", async (req: Request, res: Response) => {
         });
 
         res.json({ recommendations: mapped, page, limit, total });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch recommendations:", err);
-        res.status(500).json({ error: "Failed to fetch recommendations", details: err.message });
+        res.status(500).json({ error: "Failed to fetch recommendations", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -80,9 +80,9 @@ recommendationsRouter.get("/:id", async (req: Request, res: Response) => {
         }
 
         res.json({ recommendation, id });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch recommendation:", err);
-        res.status(500).json({ error: "Failed to fetch recommendation", details: err.message });
+        res.status(500).json({ error: "Failed to fetch recommendation", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -104,10 +104,10 @@ recommendationsRouter.post("/generate", async (req: Request, res: Response) => {
             throw new Error(`Analysis service error: ${response.status} ${errorText}`);
         }
 
-        const data = await response.json() as any;
+        const data = await response.json() as { run_id: string };
         res.json({ status: "queued", runId: data.run_id });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to trigger generation:", err);
-        res.status(500).json({ error: "Failed to trigger generation", details: err.message });
+        res.status(500).json({ error: "Failed to trigger generation", details: err instanceof Error ? err.message : String(err) });
     }
 });

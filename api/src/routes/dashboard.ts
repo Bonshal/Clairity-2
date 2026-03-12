@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import { prisma, withRetry } from "../services/neon";
-import { Prisma } from "@prisma/client";
 
 export const dashboardRouter = Router();
 
@@ -57,7 +56,7 @@ dashboardRouter.get("/kpis", async (_req: Request, res: Response) => {
 
         // Process sentiment distribution
         const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
-        (sentimentGroups as any[]).forEach((item: any) => {
+        (sentimentGroups as { sentiment: string; _count: number }[]).forEach((item) => {
             if (item.sentiment === "positive") sentimentCounts.positive = item._count;
             else if (item.sentiment === "neutral") sentimentCounts.neutral = item._count;
             else if (item.sentiment === "negative") sentimentCounts.negative = item._count;
@@ -66,16 +65,16 @@ dashboardRouter.get("/kpis", async (_req: Request, res: Response) => {
         // Process trend counts by direction
         let emergingTrendsCount = 0;
         let viralSignalsCount = 0;
-        (trendGroups as any[]).forEach((item: any) => {
+        (trendGroups as { direction: string; _count: number }[]).forEach((item) => {
             if (item.direction === "emerging") emergingTrendsCount += item._count;
             if (item.direction === "viral") viralSignalsCount += item._count;
         });
 
         // Process platform distribution
-        const platformStats = platformsAgg as any[];
+        const platformStats = platformsAgg as { platform: string; count: bigint; avg_sentiment: number | null }[];
         const activePlatforms = platformStats.length;
 
-        const platformCounts = platformStats.map((p: any) => ({
+        const platformCounts = platformStats.map((p) => ({
             platform: p.platform,
             count: Number(p.count),
             sentiment: p.avg_sentiment || 0,
@@ -96,7 +95,7 @@ dashboardRouter.get("/kpis", async (_req: Request, res: Response) => {
                     JOIN sentiment_results s ON c.id = s.content_id
                     WHERE LOWER(c.title || ' ' || COALESCE(c.body, '')) LIKE ${'%' + topKeyword.toLowerCase() + '%'}
                     GROUP BY s.sentiment
-                ` as any[];
+                ` as { sentiment: string; count: bigint; avg_score: number | null }[];
 
                 topTrendSentiment = {
                     keyword: topKeyword,
@@ -152,9 +151,9 @@ dashboardRouter.get("/kpis", async (_req: Request, res: Response) => {
             topTrendSentiment,
             contentGapScore,
         });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch KPIs:", err);
-        res.status(500).json({ error: "Failed to fetch KPIs", details: err.message });
+        res.status(500).json({ error: "Failed to fetch KPIs", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -179,9 +178,9 @@ dashboardRouter.get("/alerts", async (_req: Request, res: Response) => {
         });
 
         res.json({ alerts });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch alerts:", err);
-        res.status(500).json({ error: "Failed to fetch alerts", details: err.message });
+        res.status(500).json({ error: "Failed to fetch alerts", details: err instanceof Error ? err.message : String(err) });
     }
 });
 
@@ -201,16 +200,16 @@ dashboardRouter.get("/history", async (_req: Request, res: Response) => {
         `;
 
         // Process into format expected by Recharts: [{ date: 'Mon', reddit: 10, twitter: 5 }, ...]
-        const map = new Map<string, any>();
+        const map = new Map<string, { day: string; reddit: number; twitter: number; youtube: number }>();
 
-        (result as any[]).forEach((row: any) => {
+        (result as { date: Date; platform: string; count: bigint }[]).forEach((row) => {
             const dateKey = new Date(row.date).toLocaleDateString("en-US", { weekday: "short" }); // "Mon", "Tue"
 
             if (!map.has(dateKey)) {
                 map.set(dateKey, { day: dateKey, reddit: 0, twitter: 0, youtube: 0 });
             }
 
-            const entry = map.get(dateKey);
+            const entry = map.get(dateKey)!;
             const platform = row.platform.toLowerCase();
             if (platform === "reddit") entry.reddit = Number(row.count);
             else if (platform === "twitter" || platform === "x") entry.twitter = Number(row.count);
@@ -219,8 +218,8 @@ dashboardRouter.get("/history", async (_req: Request, res: Response) => {
 
         const timeline = Array.from(map.values());
         res.json({ timeline });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("Failed to fetch history:", err);
-        res.status(500).json({ error: "Failed to fetch history", details: err.message });
+        res.status(500).json({ error: "Failed to fetch history", details: err instanceof Error ? err.message : String(err) });
     }
 });
