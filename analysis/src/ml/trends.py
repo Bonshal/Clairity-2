@@ -258,7 +258,6 @@ def extract_candidates_semantic(texts: list[str], top_n: int = 50) -> list[str]:
         # We only want n-grams that match specific POS patterns
         def candidate_selection(text):
             doc = nlp(text)
-            candidates = set()
             
             for token in doc:
                 # Bigrams/Trigrams check

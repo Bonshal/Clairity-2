@@ -97,9 +97,6 @@ def get_random_api_key() -> str | None:
         keys = [k.strip() for k in multi_keys.split(",") if k.strip()]
         if keys:
             selected = random.choice(keys)
-            # Mask key for logging
-            masked = selected[:4] + "..." + selected[-4:] if len(selected) > 8 else "***"
-            # logger.debug(f"Using API Key: {masked}")
             return selected
 
     # 2. Fallback to single keys
