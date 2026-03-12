@@ -24,8 +24,8 @@ FROM base AS production
 COPY src/ ./src/
 
 # Download spaCy model at build time so it's baked into the image
-# (avoids the runtime "model not found" error)
-RUN uv run python -m spacy download en_core_web_sm
+# (We must install pip first because uv environments intentionally exclude pip to save space, but spacy requires it)
+RUN uv pip install pip && uv run python -m spacy download en_core_web_sm
 
 # Run as non-root
 RUN useradd -m appuser && chown -R appuser /app
