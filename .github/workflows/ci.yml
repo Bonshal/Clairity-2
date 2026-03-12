@@ -111,5 +111,5 @@ jobs:
             git pull origin main
             docker compose build
             docker compose up -d
-            docker compose exec -T api npx prisma db push --skip-generate || true
+            docker compose exec -T node-api npx prisma db push --skip-generate || true
             docker compose ps
