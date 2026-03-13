@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     analysis_port: int = 8000
     jwt_secret: str = "dev-secret-change-me"
+    cors_origin: str = "http://localhost:3000"
 
     # ─── ML Config ────────────────────────────────────────
     sentiment_model: str = "cardiffnlp/twitter-roberta-base-sentiment-latest"
